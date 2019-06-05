@@ -12,9 +12,10 @@ process.env.VUE_APP_BUILD_TIME = require('dayjs')().format('YYYY-M-D HH:mm:ss')
 let publicPath = '/'
 const outputDir = '../src/main/resources/static'
 module.exports = {
-  publicPath, // 根据你的实际情况更改这里
-  // lintOnSave: true,
+  // 根据你的实际情况更改这里
+  publicPath,
   outputDir,
+  lintOnSave: true,
   devServer: {
     publicPath // 和 publicPath 保持一致
   },
@@ -47,7 +48,7 @@ module.exports = {
         config => config.devtool('cheap-source-map')
       )
       // TRAVIS 构建 vue-loader 添加 filename
-      .when(process.env.VUE_APP_BUILD_MODE === 'TRAVIS' || process.env.NODE_ENV === 'development',
+      .when(process.env.VUE_APP_SCOURCE_LINK === 'TRUE',
         VueFilenameInjector(config, {
           propName: process.env.VUE_APP_SOURCE_VIEWER_PROP_NAME
         })
@@ -69,12 +70,12 @@ module.exports = {
             })
           ])
       })
-    // i18n
+    // markdown
     config.module
-      .rule('i18n')
-      .resourceQuery(/blockType=i18n/)
-      .use('i18n')
-      .loader('@kazupon/vue-i18n-loader')
+      .rule('md')
+      .test(/\.md$/)
+      .use('text-loader')
+      .loader('text-loader')
       .end()
     // svg
     const svgRule = config.module.rule('svg')
@@ -101,10 +102,19 @@ module.exports = {
       .set('@api', resolve('src/api'))
     // 判断环境加入模拟数据
     const entry = config.entry('app')
-    if (process.env.VUE_APP_BUILD_MODE !== 'nomock') {
+    if (process.env.VUE_APP_BUILD_MODE !== 'NOMOCK') {
       entry
         .add('@/mock')
         .end()
+    }
+  },
+  // i18n
+  pluginOptions: {
+    i18n: {
+      locale: 'zh-chs',
+      fallbackLocale: 'en',
+      localeDir: 'locales',
+      enableInSFC: true
     }
   }
 }
