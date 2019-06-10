@@ -13,7 +13,7 @@ export default {
       menu,
       banner: {
         title: 'PLAYGROUND',
-        subTitle: '在这里可以测试一些 D2Admin 的系统功能'
+        subTitle: '在这里可以测试一些sssssss D2Admin 的系统功能'
       }
     }
   }
