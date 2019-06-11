@@ -17,8 +17,10 @@ import demoD2Crud from './modules/demo-d2-crud'
 // 第三方网页
 import demoFrame from './modules/demo-frame'
 
+import hulk from './hulk'
 // 菜单 侧边栏
 export const menuAside = [
+  hulk,
   demoComponents,
   demoPlugins,
   demoCharts,
@@ -27,14 +29,9 @@ export const menuAside = [
   demoPlayground,
   demoBusiness,
   demoD2Crud,
-  demoFrame
+  demoFrame,
 ]
 
 // 菜单 顶栏
 export const menuHeader = [
-  {
-    path: '/index',
-    title: '首页',
-    icon: 'home'
-  }
 ]

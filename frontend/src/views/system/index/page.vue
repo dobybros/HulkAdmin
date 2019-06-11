@@ -1,6 +1,9 @@
 <template>
   <d2-container class="page">
-    erwerwer
+    <div class="welcome">
+      <div class="title">{{ $t("views.system.index.welcome.title")}}</div>
+      <div class="desc">{{ $t("views.system.index.welcome.desc")}}</div>
+    </div>
   </d2-container>
 </template>
 
@@ -24,6 +27,21 @@ export default {
 
 <style lang="scss" scoped>
 .page {
+  .welcome {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+
+    .title {
+      font-size: 2rem;
+    }
+    .desc {
+      font-size: 1.5rem;
+      color: #333;
+    }
+  }
   .logo {
     width: 120px;
   }

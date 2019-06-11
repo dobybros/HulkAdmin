@@ -49,16 +49,6 @@
                     <i slot="prepend" class="fa fa-keyboard-o"></i>
                   </el-input>
                 </el-form-item>
-                <el-form-item prop="code">
-                  <el-input
-                    type="text"
-                    v-model="formLogin.code"
-                    :placeholder="$t('views.system.login.form.placeholder.code')">
-                    <template slot="append">
-                      <img class="login-code" src="./image/login-code.png">
-                    </template>
-                  </el-input>
-                </el-form-item>
                 <el-button
                   size="default"
                   @click="submit"
@@ -75,9 +65,9 @@
               <span>{{ $t('views.system.login.options.register') }}</span>
             </p>
             <!-- quick login -->
-            <el-button class="page-login--quick" size="default" type="info" @click="dialogVisible = true">
-              {{ $t('views.system.login.quick-login.toggle-button.text') }}
-            </el-button>
+<!--            <el-button class="page-login&#45;&#45;quick" size="default" type="info" @click="dialogVisible = true">-->
+<!--              {{ $t('views.system.login.quick-login.toggle-button.text') }}-->
+<!--            </el-button>-->
           </div>
         </div>
         <div class="page-login--content-footer">

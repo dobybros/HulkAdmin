@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
 
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration.class, DataSourceTransactionManagerAutoConfiguration.class, MongoAutoConfiguration.class, MongoDataAutoConfiguration.class])
 
+
 class HulkAdminApplication {
 
 	static void main(String[] args) {
