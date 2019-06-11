@@ -1,12 +1,10 @@
-package com.dobybros.hulkadmin.controller
+package com.dobybros.hulkadmin.controllers
 
 import com.dobybros.hulkadmin.remoteService.resource.ResourceService
 import com.docker.rpc.remote.stub.ServiceStubManager
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-
-import javax.xml.ws.Service
 
 /**
  * Created by lick on 2019/6/10.

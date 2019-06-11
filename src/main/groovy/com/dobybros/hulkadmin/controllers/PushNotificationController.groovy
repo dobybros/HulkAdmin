@@ -1,4 +1,4 @@
-package com.dobybros.hulkadmin.controller
+package com.dobybros.hulkadmin.controllers
 
 import com.dobybros.hulkadmin.remoteService.data.AppInfo
 import com.dobybros.hulkadmin.remoteService.resource.InternalApiService
