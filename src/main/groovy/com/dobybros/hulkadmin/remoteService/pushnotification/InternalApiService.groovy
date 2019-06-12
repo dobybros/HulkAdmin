@@ -1,8 +1,6 @@
-package com.dobybros.hulkadmin.remoteService.resource
+package com.dobybros.hulkadmin.remoteService.pushnotification
 
-import com.dobybros.hulkadmin.remoteService.data.AppInfo
-
-import javax.servlet.http.HttpServletRequest
+import com.dobybros.hulkadmin.remoteService.pushnotification.AppInfo
 
 interface InternalApiService {
      static final String SERVICE = "pushnotification"

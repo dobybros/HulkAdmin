@@ -1,4 +1,4 @@
-package com.dobybros.hulkadmin.remoteService.data
+package com.dobybros.hulkadmin.remoteService.pushnotification
 
 
 public class AppInfo {
