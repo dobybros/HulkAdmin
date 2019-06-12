@@ -130,9 +130,15 @@
     "pushnoti": {
       "title": {
         "app-id": "App Id",
+        "platforms": "Platforms",
+        "platform": "Type",
+        "keychain": "Keychain",
         "bundle-id": "Bundle Id",
-        "actions": "Actions"
+        "actions": "Actions",
+        "save": "Save"
       },
+      "uploadFileHere": "Drop or select keychain file here to upload",
+      "add": "add",
       "new-app": "New App",
       "detail": "Detail"
     },
