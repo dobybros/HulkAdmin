@@ -10,5 +10,7 @@ class Platform{
 
      String keychainUri
 
+     String keychainRid
+
      String fileFullName
 }
