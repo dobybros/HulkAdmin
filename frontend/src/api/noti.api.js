@@ -6,7 +6,10 @@ export function GetAllApps() {
     method: 'get'
   })
 }
-export function UploadFiles(files) {
-  const formData = new FormData()
-
+export function SaveApp(app) {
+  return request({
+    url: '/noti/app',
+    method: 'post',
+    data: app
+  })
 }

@@ -8,28 +8,41 @@
     </el-header>
     <el-main>
       <el-table
-          :data="tableData"
+          :data="apps"
           style="width: 100%">
         <el-table-column
-            prop="date"
+            prop="appId"
             :label="$t('views.pushnoti.title.app-id')"
             width="180">
         </el-table-column>
+        <el-table-column type="expand">
+          <template slot-scope="scope">
+            <el-table :data="scope.row.platforms">
+              <el-table-column prop="type" :label="$t('views.pushnoti.title.platform')"/>
+              <el-table-column prop="bundle" :label="$t('views.pushnoti.title.bundle-id')"/>
+              <el-table-column prop="file" :label="$t('views.pushnoti.title.keychain')"/>
+            </el-table>
+          </template>
+        </el-table-column>
         <el-table-column
-            prop="name"
-            :label="$t('views.pushnoti.title.bundle-id')">
+            :label="$t('views.pushnoti.title.platforms')">
+          <template slot-scope="scope">
+            {{scope.row.platforms.length}}
+          </template>
         </el-table-column>
         <el-table-column
             width="180"
             :label="$t('views.pushnoti.title.actions')">
-          <el-button>{{$t("views.pushnoti.detail")}}</el-button>
+          <template slot-scope="scope">
+            <el-button @click="showDetail(scope.row)">{{$t("views.pushnoti.detail")}}</el-button>
+          </template>
         </el-table-column>
       </el-table>
     </el-main>
     <el-dialog :visible.sync="dialogVisible">
       <el-row type="flex" justify="center">
         <el-upload
-            action="https://dtc.acucom.net:8066/rest/resource/upload" drag
+            :action="resPath" drag
             :on-remove="fileChanged"
             :on-success="uploadedFile"
             multiple>
@@ -46,7 +59,7 @@
       <el-row type="flex" justify="space-between">
         <el-col class="model-title" :span="6">{{$t('views.pushnoti.title.platforms')}}</el-col>
       </el-row>
-      <el-card v-for="(platform, index) in editingApp.platforms" style="margin-top: 5px">
+      <el-card v-for="(platform, index) in editingApp.platforms" :key="platform.id" style="margin-top: 5px">
         <el-row>
           <el-col :span="6">{{$t('views.pushnoti.title.platform')}}</el-col>
           <el-col :span="18">
@@ -69,10 +82,6 @@
                 v-model="platform.file"
                 :fetch-suggestions="uploadedFileFilter"
                 clearable>
-              <template slot-scope="{ item }">
-                <div class="name">{{ item.name }}</div>
-                <span class="rid">{{ item.value }}</span>
-              </template>
             </el-autocomplete>
           </el-col>
         </el-row>
@@ -87,13 +96,18 @@
       </el-row>
 
       <el-row>
-        <el-button style="width: 100%; margin-top: 15px" type="primary" round>{{$t('views.pushnoti.title.save')}}</el-button>
+        <el-button style="width: 100%; margin-top: 15px"
+                   type="primary"
+                   round
+                   @click="saveApp">
+          {{$t('views.pushnoti.title.save')}}
+        </el-button>
       </el-row>
     </el-dialog>
   </el-container>
 </template>
 <script>
-  import {GetAllApps} from "@api/noti.api";
+  import {GetAllApps, SaveApp} from "@api/noti.api";
 
   const platforms = [
     {value: "ios_apn"},
@@ -102,10 +116,12 @@
   ]
 
   const emptyPlatform = () => {
+
     return {
       bundle: "",
       type: "",
-      file: null
+      file: null,
+      id: (Math.random() + '').substring(2)
     }
   }
 
@@ -115,12 +131,27 @@
       platforms: []
     }
   }
+
+  const transToUiObject = function (app) {
+    const tempA = {}
+    tempA.appId = app.appId
+    tempA.platforms = []
+    app.platforms.forEach(plt => {
+      const tempP = {}
+      tempP.file = plt.fileFullName
+      tempP.type = plt.platform
+      tempP.bundle = plt.namespace
+      tempA.platforms.push(tempP)
+    })
+    return tempA
+  }
   export default {
     data() {
       return {
+        resPath: process.env.VUE_APP_RESOURCE_HOST + 'rest/resource/upload',
         filesMap: {},
         editingApp: emptyApp(),
-        tableData: [{
+        apps: [{
           date: '2016-05-02',
           name: '王小虎',
           address: '上海市普陀区金沙江路 1518 弄',
@@ -145,6 +176,11 @@
       GetAllApps()
         .then(resp => {
           this.$message.success("Updated!")
+          const apps = []
+          resp.forEach(app => {
+            apps.push(transToUiObject(app))
+          })
+          this.apps = apps
         })
         .catch(err => {
           this.$message.error(err);
@@ -154,6 +190,36 @@
     methods: {
       newApp() {
         this.editingApp = emptyApp()
+      },
+      showDetail(app) {
+        this.editingApp = app
+        this.showModal()
+      },
+      checkValidity() {
+        const checkedApp = {}
+        const editing = this.editingApp
+        if (!editing.appId) throw new Error("App Id can not be null")
+        if (!editing.platforms || !editing.platforms.length) throw new Error("One platform at least")
+
+        checkedApp.appId = editing.appId
+        checkedApp.platforms = []
+        editing.platforms.forEach(p => {
+            const tempP = {}
+            if (!p.type) throw new Error("Platform type is required")
+            if (!p.file) throw new Error("Keychain file is required")
+            const fileRid = this.filesMap[p.file]
+            if (!fileRid) throw new Error("No updated keychain is found")
+
+            tempP.namespace = p.bundle
+            tempP.platform = p.type
+            tempP.fileFullName = p.file
+            const uri = process.env.VUE_APP_RESOURCE_HOST + 'rest/' + this.filesMap[p.file]
+            tempP.keychainUri = uri
+            tempP.keychainRid = fileRid
+            checkedApp.platforms.push(tempP)
+          }
+        )
+        return checkedApp
       },
       showModal() {
         this.dialogVisible = true
@@ -167,10 +233,10 @@
       uploadedFileFilter(str, cb) {
         const files = Object.keys(this.filesMap).map(
           filename => {
-            return {value: this.filesMap[filename], name: filename}
+            return {value: filename}
           }
         )
-        const result = str ? files.filter(f => f.name.indexOf(str) !== -1 || f.value.indexOf(str) !== -1) : files
+        const result = str ? files.filter(f => f.value.indexOf(str) !== -1) : files
         cb(result)
       },
       suggestions(str, cb) {
@@ -182,6 +248,19 @@
       },
       removePlatform(index) {
         this.editingApp.platforms.splice(index, 1)
+      },
+      saveApp() {
+        try {
+          SaveApp(this.checkValidity())
+            .then(() => {
+              this.dialogVisible = false
+            })
+            .catch(err => {
+              this.$message.error(err)
+            })
+        } catch (e) {
+          this.$message.error(e.message)
+        }
       }
     },
   }
@@ -208,10 +287,12 @@
   .el-upload {
     width: 100%;
   }
+
   .name {
     text-overflow: ellipsis;
     overflow: hidden;
   }
+
   .rid {
     font-size: 12px;
     color: #b4b4b4;
