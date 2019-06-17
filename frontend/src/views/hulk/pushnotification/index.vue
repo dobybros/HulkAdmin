@@ -151,23 +151,7 @@
         resPath: process.env.VUE_APP_RESOURCE_HOST + 'rest/resource/upload',
         filesMap: {},
         editingApp: emptyApp(),
-        apps: [{
-          date: '2016-05-02',
-          name: '王小虎',
-          address: '上海市普陀区金沙江路 1518 弄',
-        }, {
-          date: '2016-05-04',
-          name: '王小虎',
-          address: '上海市普陀区金沙江路 1518 弄'
-        }, {
-          date: '2016-05-01',
-          name: '王小虎',
-          address: '上海市普陀区金沙江路 1518 弄',
-        }, {
-          date: '2016-05-03',
-          name: '王小虎',
-          address: '上海市普陀区金沙江路 1518 弄'
-        }],
+        apps: [],
         dialogVisible: false,
       }
     }
@@ -213,7 +197,7 @@
             tempP.namespace = p.bundle
             tempP.platform = p.type
             tempP.fileFullName = p.file
-            const uri = process.env.VUE_APP_RESOURCE_HOST + 'rest/' + this.filesMap[p.file]
+            const uri = process.env.VUE_APP_RESOURCE_HOST + 'rest/resource/' + this.filesMap[p.file]
             tempP.keychainUri = uri
             tempP.keychainRid = fileRid
             checkedApp.platforms.push(tempP)
