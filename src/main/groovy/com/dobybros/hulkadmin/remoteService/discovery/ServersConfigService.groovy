@@ -10,4 +10,6 @@ interface ServersConfigService {
     String SERVICE = "discovery"
     public void addConfig(List<Document> documents)
     List<Document> getConfigs()
+    void updateConfig(Document config)
+    void deleteConfig(String serviceName)
 }

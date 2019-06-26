@@ -10,33 +10,28 @@ export default {
         },
         {
             path: `${pre}deployconfig`,
-            title: 'Deploy_config ',
+            title: 'Deploy Config ',
+            icon: 'commenting'
+        },
+        {
+            path: `${pre}deployuploadgroovy`,
+            title: 'Deploy Upload Groovy ',
+            icon: 'commenting'
+        },
+        {
+            path: `${pre}deployserviceversion`,
+            title: 'Deploy ServiceVersion ',
+            icon: 'commenting'
+        },
+        {
+            path: `${pre}deployreloadcontainer`,
+            title: 'Deploy Reload Container ',
+            icon: 'commenting'
+        },
+        {
+            path: `${pre}deployreloadnginx`,
+            title: 'Deploy Reload Nginx ',
             icon: 'commenting'
         }
-        // {
-        //     path: `${pre}push-notification`,
-        //     title: 'Deploy_uploadGroovy ',
-        //     icon: 'commenting'
-        // },
-        // {
-        //     path: `${pre}push-notification`,
-        //     title: 'Deploy_config ',
-        //     icon: 'commenting'
-        // },
-        // {
-        //     path: `${pre}push-notification`,
-        //     title: 'Deploy_serviceVersion ',
-        //     icon: 'commenting'
-        // },
-        // {
-        //     path: `${pre}push-notification`,
-        //     title: 'Deploy_modifyNginx ',
-        //     icon: 'commenting'
-        // },
-        // {
-        //     path: `${pre}push-notification`,
-        //     title: 'Deploy_restartContainer ',
-        //     icon: 'commenting'
-        // }
     ])("/hulk/")
 }
