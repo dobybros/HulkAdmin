@@ -58,12 +58,12 @@
                 </el-button>
               </el-form>
             </el-card>
-            <p
+           <!--  <p
               class="page-login--options"
               flex="main:justify cross:center">
               <span><d2-icon name="question-circle"/> {{ $t('views.system.login.options.forget-password') }}</span>
               <span>{{ $t('views.system.login.options.register') }}</span>
-            </p>
+            </p>-->
             <!-- quick login -->
 <!--            <el-button class="page-login&#45;&#45;quick" size="default" type="info" @click="dialogVisible = true">-->
 <!--              {{ $t('views.system.login.quick-login.toggle-button.text') }}-->

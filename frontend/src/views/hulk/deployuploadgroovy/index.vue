@@ -1,7 +1,7 @@
 <template>
     <el-container>
         <el-main>
-            <el-button type="primary" round @click="newServiceVersion">Add New Service</el-button>
+            <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.addNewService")}}</el-button>
             <div>
                 <el-table
                         :data="tableData"
@@ -31,13 +31,13 @@
                                     @click.native.prevent="openUploadDialog(scope.row)"
                                     type="primary"
                                     size="medium">
-                                Edit
+                                {{$t("views.deploy.edit")}}
                             </el-button>
                             <el-button
                                     @click.native.prevent="openDeleteDialog(scope.$index, scope.row)"
                                     type="danger"
                                     size="medium">
-                                Delete
+                                {{$t("views.deploy.delete")}}
                             </el-button>
                         </template>
                     </el-table-column>
@@ -51,7 +51,7 @@
             <el-row>
                 <el-col :span="10">
                     <el-input v-model="serviceName" placeholder="Input service name">
-                        <template slot="prepend">service name</template>
+                        <template slot="prepend">{{$t("views.deploy.serviceName")}}</template>
                     </el-input>
                 </el-col>
                 <el-col :span="4">
@@ -76,27 +76,27 @@
                             :file-list="fileList"
                             :limit="1"
                             :auto-upload="false">
-                <el-button slot="trigger" size="medium" type="primary">Select file</el-button>
+                <el-button slot="trigger" size="medium" type="primary">{{$t("views.deploy.selectFile")}}</el-button>
                 <el-button style="margin-left: 10px;" size="medium" type="success"
-                           @click="submitUpload">Upload</el-button>
+                           @click="submitUpload">{{$t("views.deploy.upload")}}</el-button>
                     </el-upload>
                 </span>
 
                 <span class="cancel-delete">
-                    <el-button size="medium" @click="cancelEdit">Cancel</el-button>
-                    <el-button size="medium" type="danger" @click="deleteServiceVersion">Delete</el-button>
+                    <el-button size="medium" @click="cancelEdit">{{$t("views.deploy.cancel")}}</el-button>
+                    <el-button size="medium" type="danger" @click="deleteServiceVersion">{{$t("views.deploy.delete")}}</el-button>
                 </span>
 
   </span>
         </el-dialog>
         <el-dialog
-                title="Reminder"
+                :title="$t('views.deploy.reminder')"
                 :visible.sync="deleteGroovyDialogVisible"
                 width="30%">
-            <span>Confirm delete service <span style="color: #000fff">{{this.deleteServiceName}}</span>?</span>
+            <span>{{$t("views.deploy.confrimDeleteService")}}<span style="color: #000fff">{{this.deleteServiceName}}</span>?</span>
             <span slot="footer" class="dialog-footer">
-                <el-button @click="cancelDelete">Cancel</el-button>
-                <el-button type="primary" @click="sureDelete">Sure</el-button>
+                <el-button @click="cancelDelete">{{$t("views.deploy.cancel")}}</el-button>
+                <el-button type="primary" @click="sureDelete">{{$t("views.deploy.sure")}}</el-button>
              </span>
         </el-dialog>
 

@@ -43,5 +43,7 @@ class ApplicationConfig {
     public String nginxIp
     @Value('${nginx.port}')
     public String nginxPort
+    @Value('${token.expire.time}')
+    public String tokenExpireTime
 
 }

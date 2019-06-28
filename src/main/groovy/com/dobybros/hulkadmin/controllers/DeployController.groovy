@@ -356,16 +356,16 @@ class DeployController {
             }
         }
         ShellClient sshClient = new ShellClient(applicationConfig.nginxIp, applicationConfig.nginxAccount, applicationConfig.nginxPasswd, Integer.valueOf(applicationConfig.nginxPort))
-//        List firstFilenames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath)
-        List firstFilenames = sshClient.excuteCommand("sudo ls /root/aa")
+        List firstFilenames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath)
+//        List firstFilenames = sshClient.excuteCommand("sudo ls /root/aa")
         List webFileList = new ArrayList()
         List webFiles = null
         Map webFileMap = null
         if (firstFilenames != null && firstFilenames.size() > 0) {
             //tc這一層
             for (String firstFileName : firstFilenames) {
-//                List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + firstFileName)
-                List secondFileNames = sshClient.excuteCommand("sudo ls /root/aa" + "/" + firstFileName)
+                List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + firstFileName)
+//                List secondFileNames = sshClient.excuteCommand("sudo ls /root/aa" + "/" + firstFileName)
                 if (secondFileNames != null && secondFileNames.size() > 0) {
                     webFileMap = new HashMap()
                     webFiles = new ArrayList()
@@ -432,8 +432,8 @@ class DeployController {
     @GetMapping("/serverweb/web/{webName}")
     def getWebVersionsByWebName(@PathVariable String webName) {
         ShellClient sshClient = new ShellClient(applicationConfig.nginxIp, applicationConfig.nginxAccount, applicationConfig.nginxPasswd, Integer.valueOf(applicationConfig.nginxPort))
-//        List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webName)
-        List secondFileNames = sshClient.excuteCommand("sudo ls /root/aa" + "/" + webName)
+        List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webName)
+//        List secondFileNames = sshClient.excuteCommand("sudo ls /root/aa" + "/" + webName)
         if (secondFileNames != null && secondFileNames.size() > 0) {
             List webFiles = new ArrayList()
             List list = new ArrayList()
@@ -518,8 +518,7 @@ class DeployController {
                 sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + " " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak)
                 Thread.sleep(1000)
                 sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + targetDir + " " + applicationConfig.nginxRemotePath + nginxFileName)
-//                SslClient.getInstance(applicationConfig.nginxIp, applicationConfig.nginxAccount, applicationConfig.nginxPasswd, Integer.valueOf(applicationConfig.nginxPort))
-//                        .excuteCommand("sudo docker exec nginx nginx -s reload")
+                sshClient.excuteCommand("sudo docker exec nginx nginx -s reload")
             } catch (Exception e) {
                 FileUtils.deleteQuietly(new File(originPath))
                 FileUtils.deleteQuietly(new File(targetDir))
@@ -550,29 +549,29 @@ class DeployController {
         if (dockerStatus != null) {
             DockerStatusService dockerStatusService = serviceStubManager.getService(DockerStatusService.SERVICE, DockerStatusService.class)
             if (dockerStatus.server != null && dockerStatus.ip != null && dockerStatus.dockerName != null) {
-                    InputStream inStream = DeployController.class.getClassLoader().getResourceAsStream("application.properties");
-                    Properties prop = new Properties();
-                    prop.load(inStream)
-                    String ip = dockerStatus.ip
-                    String address = prop.getProperty(dockerStatus.ip)
-                    if (address != null) {
-                        String[] addresses = address.split(",")
-                        String port = addresses[1]
-                        String account = addresses[2]
-                        String passwd = addresses[3]
-                        if (StringUtils.isEmpty(port)) {
-                            port = "22"
-                        }
-                        if (StringUtils.isEmpty(account)) {
-                            account = ""
-                        }
-                        if (StringUtils.isEmpty(passwd)) {
-                            passwd = ""
-                        }
-                        ShellClient sshClient = new ShellClient(ip, account, passwd, Integer.valueOf(port))
-//                        dockerStatusService.deleteDockerStatus(dockerStatus.server)
-//                        sshClient.excuteCommand("sudo docker restart " + dockerStatus.dockerName)
+                InputStream inStream = DeployController.class.getClassLoader().getResourceAsStream("application.properties");
+                Properties prop = new Properties();
+                prop.load(inStream)
+                String ip = dockerStatus.ip
+                String address = prop.getProperty(dockerStatus.ip)
+                if (address != null) {
+                    String[] addresses = address.split(",")
+                    String port = addresses[1]
+                    String account = addresses[2]
+                    String passwd = addresses[3]
+                    if (StringUtils.isEmpty(port)) {
+                        port = "22"
                     }
+                    if (StringUtils.isEmpty(account)) {
+                        account = ""
+                    }
+                    if (StringUtils.isEmpty(passwd)) {
+                        passwd = ""
+                    }
+                    ShellClient sshClient = new ShellClient(ip, account, passwd, Integer.valueOf(port))
+                    dockerStatusService.deleteDockerStatus(dockerStatus.server)
+                    sshClient.excuteCommand("sudo docker restart " + dockerStatus.dockerName)
+                }
             }
         }
     }

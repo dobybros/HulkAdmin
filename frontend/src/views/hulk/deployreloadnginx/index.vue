@@ -1,19 +1,19 @@
 <template>
     <el-main>
         <el-row>
-            <el-col :span="13"><div class="grid-content bg-purple-dark font-style" style="">Server</div></el-col>
+            <el-col :span="13"><div class="grid-content bg-purple-dark font-style" style="">{{$t("views.deploy.server")}}</div></el-col>
         </el-row>
         <el-row>
-            <el-col :span="10">
-                <span class="font-style">ServerName</span>
-            </el-col>
-            <el-col :span="7">
-                <span class="font-style">Version</span>
-            </el-col>
+        <el-col :span="10">
+            <span class="font-style">{{$t("views.deploy.serviceName")}}</span>
+        </el-col>
+        <el-col :span="7">
+            <span class="font-style">{{$t("views.deploy.version")}}</span>
+        </el-col>
         </el-row>
         <el-row v-for="server in this.servers">
             <el-col :span="10">
-                <el-input v-model="server.serviceName" clearable></el-input>
+                <el-input v-model="server.serviceName" clearable placeholder="Input service name"></el-input>
             </el-col>
             <el-col :span="13">
                 <el-select  v-model="server.currentVersion" @click.native="getServerVersions(server.serviceName)" placeholder="Select version">
@@ -26,23 +26,24 @@
                 </el-select>
             </el-col>
         </el-row>
-        <el-row>
+        <el-row style="margin: 15px 0;">
             <el-col><el-button type="primary" icon="el-icon-plus" round @click="addServer"></el-button></el-col>
         </el-row>
+
         <el-row>
-            <el-col :span="13"><div class="grid-content bg-purple-dark font-style" style="">Web</div></el-col>
+            <el-col :span="13"><div class="grid-content bg-purple-dark font-style" style="">{{$t("views.deploy.web")}}</div></el-col>
         </el-row>
         <el-row>
             <el-col :span="10">
-                <span class="font-style">WebName</span>
+                <span class="font-style">{{$t("views.deploy.webName")}}</span>
             </el-col>
             <el-col :span="7">
-                <span class="font-style">Version</span>
+                <span class="font-style">{{$t("views.deploy.version")}}</span>
             </el-col>
         </el-row>
         <el-row v-for="web in this.webs">
             <el-col :span="10">
-                <el-input v-model="web.webName" clearable></el-input>
+                <el-input v-model="web.webName" clearable clearable placeholder="Input web name"></el-input>
             </el-col>
             <el-col :span="14">
                 <el-select v-model="web.currentVersion" @click.native="getWebVersions(web.webName)" placeholder="Select version">
@@ -56,10 +57,10 @@
             </el-col>
         </el-row>
         <el-row>
-            <el-col><el-button type="primary" icon="el-icon-plus" round @click="addWeb"></el-button></el-col>
+            <el-col><el-button type="primary" icon="el-icon-plus" round @click="addWeb" style="margin: 15px 0px;"></el-button></el-col>
         </el-row>
-        <el-row>
-            <el-col :span="10" :offset="5"><el-button type="primary" round @click="reload">Reload Nginx</el-button></el-col>
+        <el-row style="">
+            <el-col :span="13" style="position: relative"><el-button type="primary" round @click="reload" style="float: right;">{{$t("views.deploy.reloadNginx")}}</el-button></el-col>
         </el-row>
     </el-main>
 </template>
@@ -94,7 +95,6 @@
                 }else {
                     GetServerVersions(serviceName)
                         .then(resp => {
-                            this.$message.success("Success!")
                             for (let i=0;i < this.servers.length; i++){
                                 if(this.servers[i]["serviceName"] === serviceName){
                                     this.servers[i]["versions"] = resp
@@ -112,7 +112,6 @@
                 }else {
                     GetWebVersions(webName)
                         .then(resp => {
-                            this.$message.success("Success!")
                             for (let i=0;i < this.webs.length; i++){
                                 if(this.webs[i]["webName"] === webName){
                                     this.webs[i]["versions"] = resp

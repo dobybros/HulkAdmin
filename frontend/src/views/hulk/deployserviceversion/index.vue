@@ -1,7 +1,7 @@
 <template>
     <el-container>
         <el-main>
-            <el-button type="primary" round @click="newServiceVersion">New Service Version</el-button>
+            <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.newServiceVersion")}}</el-button>
             <el-table
                     :data="tableData"
                     border
@@ -27,12 +27,12 @@
                         label="Operations"
                         width="300">
                     <template slot-scope="scope">
-                        <el-button type="primary" size="medium" @click="openServiceVersionDialog(scope.row)">Edit</el-button>
+                        <el-button type="primary" size="medium" @click="openServiceVersionDialog(scope.row)">{{$t("views.deploy.edit")}}</el-button>
                         <el-button
                                 @click.native.prevent="openDeleteServiceVersionDialog(scope.$index, scope.row)"
                                 type="danger"
                                 size="medium">
-                            Delete
+                            {{$t("views.deploy.delete")}}
                         </el-button>
                     </template>
                 </el-table-column>
@@ -70,18 +70,18 @@
             <div slot="footer" class="dialog-footer">
                 <el-button style="float: left" type="primary" icon="el-icon-plus" circle
                            @click="addServiceVersion"></el-button>
-                <el-button @click="cancelEditServiceVersion">Cancel</el-button>
-                <el-button type="primary" @click="saveServiceVersion">Save</el-button>
+                <el-button @click="cancelEditServiceVersion">{{$t("views.deploy.cancel")}}</el-button>
+                <el-button type="primary" @click="saveServiceVersion">{{$t("views.deploy.save")}}</el-button>
             </div>
         </el-dialog>
         <el-dialog
-                title="Reminder"
+                :title="$t('views.deploy.reminder')"
                 :visible.sync="deleteServiceVersionVisible"
                 width="30%">
             <span>Confirm delete this serviceVersion?</span>
             <span slot="footer" class="dialog-footer">
-                <el-button @click="cancelDelete">Cancel</el-button>
-                <el-button type="primary" @click="sureDelete">Sure</el-button>
+                <el-button @click="cancelDelete">{{$t("views.deploy.cancel")}}</el-button>
+                <el-button type="primary" @click="sureDelete">{{$t("views.deploy.sure")}}</el-button>
              </span>
         </el-dialog>
     </el-container>

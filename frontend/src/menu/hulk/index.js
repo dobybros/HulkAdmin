@@ -25,7 +25,7 @@ export default {
         },
         {
             path: `${pre}deployreloadcontainer`,
-            title: 'Deploy Reload Container ',
+            title: 'Deploy Reload Server ',
             icon: 'commenting'
         },
         {

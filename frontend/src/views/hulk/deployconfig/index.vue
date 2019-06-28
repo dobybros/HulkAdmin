@@ -1,7 +1,7 @@
 <template>
     <el-container>
         <el-main>
-            <el-button type="primary" round @click="newServiceConfig">New Service Config</el-button>
+            <el-button type="primary" round @click="newServiceConfig">{{$t("views.deploy.newServiceConfig")}}</el-button>
             <el-table
                     :data="tableData"
                     border
@@ -17,7 +17,7 @@
                         label="Operations"
                         width="400">
                     <template slot-scope="scope">
-                        <el-button type="primary" size="medium" @click="dialogTableVisible(scope.row)">Edit</el-button>
+                        <el-button type="primary" size="medium" @click="dialogTableVisible(scope.row)">{{$t("views.deploy.edit")}}</el-button>
                         <el-button
                                 @click.native.prevent="openDeleteDialog(scope.$index, scope.row, tableData)"
                                 type="danger"
@@ -54,13 +54,13 @@
             </div>
         </el-dialog>
         <el-dialog
-                title="Reminder"
+                :title="$t('views.deploy.reminder')"
                 :visible.sync="deleteDialogVisible"
                 width="30%">
-            <span>Confirm delete <span style="color: #000fff">{{this.deleteConfigName}}</span> config?</span>
+            <span>{{$t("views.deploy.confirmDelete")}}<span style="color: #000fff">{{this.deleteConfigName}}</span>{{$t("views.deploy.confirmConfig")}}</span>
             <span slot="footer" class="dialog-footer">
-    <el-button @click="cancelDelete">Cancel</el-button>
-    <el-button type="primary" @click="sureDelete">Sure</el-button>
+    <el-button @click="cancelDelete">{{$t("views.deploy.cancel")}}</el-button>
+    <el-button type="primary" @click="sureDelete">{{$t("views.deploy.sure")}}</el-button>
   </span>
         </el-dialog>
     </el-container>

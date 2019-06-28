@@ -19,7 +19,7 @@ export default {
         { title: 'search', iconSvg: 'search' },
         { title: 'share', iconSvg: 'share' },
         { title: 'star', iconSvg: 'star' },
-        { title: 'user', iconSvg: 'user' }
+        { title: 'config.user', iconSvg: 'config.user' }
       ]
     },
     {
@@ -79,7 +79,7 @@ export default {
       children: [
         { path: `${pre}db/all`, title: '总览', icon: 'table' },
         { path: `${pre}db/public`, title: '公共存储', icon: 'users' },
-        { path: `${pre}db/user`, title: '私有数据', icon: 'user' },
+        { path: `${pre}db/user`, title: '私有数据', icon: 'config.user' },
         { path: `${pre}db/page-public`, title: '路由存储', icon: 'file-o' },
         { path: `${pre}db/page-user`, title: '私有路由存储', icon: 'file-o' },
         { path: `${pre}db/page-snapshot-public`, title: '路由快照', icon: 'file' },

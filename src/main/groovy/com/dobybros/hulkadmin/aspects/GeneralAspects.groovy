@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class GeneralAspects {
 
-    @Around(value = "execution(* com.dobybros.hulkadmin.controllers..*.*(..)))")
+    @Around(value = "execution(* com.dobybros.hulkadmin.controllers..*.*(..))) || execution(* com.dobybros.hulkadmin.interceptor..*.*(..)))")
     public Object around(ProceedingJoinPoint joinPoint) {
         Object result = null;
         Integer code = 1;

@@ -3,6 +3,7 @@ import util from '@/libs/util.js'
 import router from '@/router'
 import { AccountLogin } from '@api/sys.login'
 import i18n from '../../../../i18n'
+import store from '@/store'
 
 export default {
   namespaced: true,

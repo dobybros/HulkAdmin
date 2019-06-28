@@ -142,6 +142,29 @@
       "new-app": "New App",
       "detail": "Detail"
     },
+    "deploy": {
+      "newServiceConfig": "New Service Config",
+      "edit": "edit",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "addNewService": "Add New Service",
+      "selectFile": "Select file",
+      "upload": "Upload",
+      "newServiceVersion": "New Service Version",
+      "reload": "Reload",
+      "reloadNginx": "Reload Nginx",
+      "sure": "Sure",
+      "confirmDelete": "Confirm delete ",
+      "confirmConfig":  " config?",
+      "server": "server",
+      "web": "web",
+      "serviceName": "service name",
+      "confrimDeleteService": "Confirm delete service ",
+      "reminder": "Reminder",
+      "version": "version",
+      "webName": "web name"
+    },
     "system": {
       "error": {
         "404": {
