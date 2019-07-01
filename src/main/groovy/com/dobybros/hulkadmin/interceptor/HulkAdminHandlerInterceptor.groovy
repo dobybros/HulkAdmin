@@ -19,7 +19,7 @@ import javax.servlet.http.HttpServletResponse
 class HulkAdminHandlerInterceptor implements HandlerInterceptor {
     boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String url = request.getServletPath();
-        if ("OPTIONS".equals(request.getMethod())) {
+        if ("OPTIONS".equals(request.getMethod()) || pass(url)) {
             return true
         } else {
             String token = request.getHeader("X-Token")
@@ -52,5 +52,11 @@ class HulkAdminHandlerInterceptor implements HandlerInterceptor {
     }
 
     void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, @Nullable Exception ex) throws Exception {
+    }
+    private Boolean pass(String url){
+        if(url.contains("css") || url.contains("js") || url.contains("icon") || url.contains("image") || url.contains("fonts") || url.contains("img") || url.contains("html") || url.contains("markdown") || url.contains("lib")){
+            return true
+        }
+        return false
     }
 }
