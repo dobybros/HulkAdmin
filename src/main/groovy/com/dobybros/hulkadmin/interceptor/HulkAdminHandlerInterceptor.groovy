@@ -54,7 +54,7 @@ class HulkAdminHandlerInterceptor implements HandlerInterceptor {
     void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, @Nullable Exception ex) throws Exception {
     }
     private Boolean pass(String url){
-        if(url.contains("css") || url.contains("js") || url.contains("icon") || url.contains("image") || url.contains("fonts") || url.contains("img") || url.contains("html") || url.contains("markdown") || url.contains("lib")){
+        if(url.contains("/index.html") || url.contains("/css/") || url.contains("/js/") || url.contains("icon.ico") || url.contains("/image/") || url.contains("/fonts/") || url.contains("/img/") || url.contains("/html/") || url.contains("/markdown/") || url.contains("/lib/")){
             return true
         }
         return false
