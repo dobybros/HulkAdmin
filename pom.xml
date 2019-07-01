@@ -215,10 +215,10 @@
 
 	<build>
 		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
+<!--			<plugin>-->
+<!--				<groupId>org.springframework.boot</groupId>-->
+<!--				<artifactId>spring-boot-maven-plugin</artifactId>-->
+<!--			</plugin>-->
 			<plugin>
 				<groupId>org.codehaus.gmavenplus</groupId>
 				<artifactId>gmavenplus-plugin</artifactId>
@@ -238,7 +238,62 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+			<artifactId>maven-compiler-plugin</artifactId>
+			<version>3.1</version>
+			<configuration>
+				<source>1.8</source>
+				<target>1.8</target>
+			</configuration>
+		</plugin>
+		<plugin>
+			<groupId>org.apache.felix</groupId>
+			<artifactId>maven-bundle-plugin</artifactId>
+			<extensions>true</extensions>
+			<version>3.2.0</version>
+		</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<addClasspath>true</addClasspath>
+							<mainClass>com.dobybros.hulkadmin.HulkAdminApplication</mainClass>
+							<classpathPrefix>lib/</classpathPrefix>
+						</manifest>
+						<manifestEntries>
+							<Class-Path>lib/cloudcore-0.0.1-SNAPSHOT.jar lib/core-0.0.1-SNAPSHOT.jar</Class-Path>
+						</manifestEntries>
+					</archive>
+					<excludes>
+						<exclude>**/*.xml</exclude>
+						<exclude>**/*.properties</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>3.1.1</version>
+				<!-- The configuration of the plugin -->
+				<configuration>
+					<descriptors>
+						<descriptor>src/main/resources/config/assembly.xml</descriptor>
+					</descriptors>
+				</configuration>
+				<executions>
+					<execution>
+						<id>make-assembly</id>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
+		<finalName>hulkadmin</finalName>
 	</build>
 
 </project>

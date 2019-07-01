@@ -84,9 +84,15 @@
                     })
             },
             addServer(){
+                if(this.servers === undefined){
+                    this.servers = []
+                }
                 this.servers.push({"currentVersion":"","serviceName":"","versions":[]})
             },
             addWeb(){
+                if(this.webs === undefined){
+                    this.webs = []
+                }
                 this.webs.push({"currentVersion":"","webName":"","versions":[]})
             },
             getServerVersions(serviceName){
