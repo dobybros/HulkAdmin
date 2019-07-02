@@ -104,11 +104,11 @@
 </template>
 <script>
     import {GetAllGroovyInfo, DeleteServiceVersion, RemoveService} from "@api/deploy.api";
-
+    import util from '@/libs/util'
     export default {
         data() {
             return {
-                uploadUrl: process.env.VUE_APP_API + "/deploy/groovyzip",
+                uploadUrl: "/open/groovyzip",
                 tableData: [],
                 serviceName: '',
                 value: '',
@@ -317,11 +317,17 @@
                 }
                 this.removeService(this.deleteServiceName)
                 this.deleteServiceName = ""
-            }
+            },
         },
         computed: {
             uploadUrlData: function () {
-                let param = this.uploadUrl + "?s=" + this.serviceName + "&v=" + this.value
+                let uploadHost = ''
+                if(process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined){
+                    uploadHost = location.protocol + "//" + location.host
+                }else {
+                    uploadHost = process.env.VUE_APP_API
+                }
+                let param = uploadHost + this.uploadUrl + "?s=" + this.serviceName + "&v=" + this.value
                 return param
             }
         }
