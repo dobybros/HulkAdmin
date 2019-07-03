@@ -1,5 +1,10 @@
 <template>
-    <el-main>
+    <el-main style="    overflow-y: auto;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;">
         <el-row>
             <el-col :span="13"><div class="grid-content bg-purple-dark font-style" style="">{{$t("views.deploy.server")}}</div></el-col>
         </el-row>
