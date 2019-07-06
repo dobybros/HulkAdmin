@@ -1,11 +1,7 @@
 package com.dobybros.hulkadmin.controllers
 
 import com.dobybros.hulkadmin.config.ApplicationConfig
-import com.dobybros.hulkadmin.remoteService.discovery.DockerStatus
-import com.dobybros.hulkadmin.remoteService.discovery.DockerStatusService
-import com.dobybros.hulkadmin.remoteService.discovery.ServersConfigService
-import com.dobybros.hulkadmin.remoteService.discovery.ServiceVersion
-import com.dobybros.hulkadmin.remoteService.discovery.ServiceVersionService
+import com.dobybros.hulkadmin.remoteService.discovery.*
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
@@ -17,7 +13,6 @@ import org.apache.commons.lang.StringUtils
 import org.bson.Document
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.*
-import org.springframework.web.multipart.MultipartFile
 import script.file.FileAdapter
 
 import java.util.concurrent.ConcurrentHashMap
@@ -45,7 +40,7 @@ class DeployController {
                 if (!StringUtils.isEmpty(key)) {
                     Map<String, String> map = config.get(key)
                     if (!StringUtils.isEmpty(map.get("key")) && !StringUtils.isEmpty(map.get("value"))) {
-                        configFinal.append(map.get("key").replaceAll(" ", ""), map.get("value").replaceAll(" ", ""))
+                        configFinal.append(map.get("key").replaceAll(" ", "").replaceAll("\\.", "_"), map.get("value").replaceAll(" ", ""))
                     }
                 }
             }

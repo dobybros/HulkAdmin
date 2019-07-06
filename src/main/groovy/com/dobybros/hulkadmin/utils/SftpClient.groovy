@@ -75,9 +75,6 @@ class SftpClient {
         if(sftp != null){
             sftp.disconnect()
         }
-        if(exec != null){
-            exec.disconnect()
-        }
         if(session != null){
             session.disconnect()
         }
