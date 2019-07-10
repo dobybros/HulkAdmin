@@ -31,7 +31,8 @@ HELP.md
 .DS_Store
 node_modules
 /dist
-
+logs
+nginx.conf
 # Log files
 npm-debug.log*
 yarn-debug.log*
