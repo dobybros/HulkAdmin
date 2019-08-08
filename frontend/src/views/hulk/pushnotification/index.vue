@@ -5,6 +5,9 @@
         <i class="el-icon-plus el-icon--left"></i>
         {{$t("views.pushnoti.new-app")}}
       </el-button>
+      <el-button type="primary" @click="update">
+        {{$t("views.pushnoti.update")}}
+      </el-button>
     </el-header>
     <el-main>
       <el-table
@@ -107,7 +110,7 @@
   </el-container>
 </template>
 <script>
-  import {GetAllApps, SaveApp} from "@api/noti.api";
+  import {GetAllApps, SaveApp, UpdateAllApps} from "@api/noti.api";
 
   const platforms = [
     {value: "ios_apn"},
@@ -172,6 +175,14 @@
     }
     ,
     methods: {
+      update() {
+        UpdateAllApps()
+          .then(resp => {
+            this.$message.success("OK!")
+          }).catch(err => {
+          this.$message.error(err)
+        })
+      },
       newApp() {
         this.editingApp = emptyApp()
       },
