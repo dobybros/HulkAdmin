@@ -6,7 +6,7 @@
                     :data="tableData"
                     border
                     style="width: 70%"
-                    max-height="700">
+                    max-height="600">
                 <el-table-column
                         prop="_id.value"
                         label="ServiceName"
@@ -122,22 +122,23 @@
                 this.dialogTableVisible(this.tableData[this.tableData.length - 1])
             },
             cancelEdit() {
-                this.dialogFormVisible = false
-                for (let key in this.deleteDataCache) {
-                    this.$set(this.everyData, key, this.deleteDataCache[key])
-                }
-                for (let key in this.addDataCache) {
-                    this.$delete(this.everyData, key)
-                }
-                for (let i = 0; i < this.tableData.length; i++) {
-                    let theData = this.tableData[i]
-                    if (theData["_id"] === undefined || theData["_id"]["value"] === undefined || theData["_id"] === "" || theData["_id"]["value"] === "") {
-                        this.tableData.splice(i, 1)
-                    }
-                }
-                this.deleteDataCache = {}
-                this.addDataCache = {}
-                this.configName = ""
+                location.reload()
+                // this.dialogFormVisible = false
+                // for (let key in this.deleteDataCache) {
+                //     this.$set(this.everyData, key, this.deleteDataCache[key])
+                // }
+                // for (let key in this.addDataCache) {
+                //     this.$delete(this.everyData, key)
+                // }
+                // for (let i = 0; i < this.tableData.length; i++) {
+                //     let theData = this.tableData[i]
+                //     if (theData["_id"] === undefined || theData["_id"]["value"] === undefined || theData["_id"] === "" || theData["_id"]["value"] === "") {
+                //         this.tableData.splice(i, 1)
+                //     }
+                // }
+                // this.deleteDataCache = {}
+                // this.addDataCache = {}
+                // this.configName = ""
             },
             cancelDelete() {
                 this.deleteDialogVisible = false
@@ -149,6 +150,14 @@
                     this.$set(this.everyData, key, {key: key, value: value})
                     this.$set(this.addDataCache, key, {key: key, value: value})
                     this.$delete(this.everyData, "")
+                    let keyData = this.everyData[key]["key"]
+                    for(let name in this.everyData){
+                        if(this.everyData[name]["key"] === keyData){
+                            if(name !== keyData){
+                                this.$delete(this.everyData, name)
+                            }
+                        }
+                    }
                 }
             },
             openDeleteDialog(index, data, rows) {
@@ -177,7 +186,7 @@
         created() {
             GetAllServerConfigs()
                 .then(resp => {
-                    this.$message.success("Updated!")
+                    this.$message.success("Get all config success!")
                     this.tableData = resp
                 })
                 .catch(err => {

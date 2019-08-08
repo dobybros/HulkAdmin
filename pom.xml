@@ -28,6 +28,10 @@
 			<artifactId>spring-boot-starter-aop</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.codehaus.groovy</groupId>
 			<artifactId>groovy</artifactId>
 		</dependency>
@@ -211,6 +215,13 @@
 			<scope>system</scope>
 			<systemPath>${basedir}/libs/core-0.0.1-SNAPSHOT.jar</systemPath>
 		</dependency>
+		<dependency>
+			<groupId>MongodbConnector</groupId>
+			<artifactId>MongodbConnector</artifactId>
+			<version>1.0.0</version>
+			<scope>system</scope>
+			<systemPath>${basedir}/libs/MongodbConnector-0.0.1-SNAPSHOT.jar</systemPath>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -263,7 +274,7 @@
 							<classpathPrefix>lib/</classpathPrefix>
 						</manifest>
 						<manifestEntries>
-							<Class-Path>lib/cloudcore-0.0.1-SNAPSHOT.jar lib/core-0.0.1-SNAPSHOT.jar</Class-Path>
+							<Class-Path>lib/cloudcore-0.0.1-SNAPSHOT.jar lib/core-0.0.1-SNAPSHOT.jar lib/MongodbConnector-0.0.1-SNAPSHOT.jar</Class-Path>
 						</manifestEntries>
 					</archive>
 					<excludes>

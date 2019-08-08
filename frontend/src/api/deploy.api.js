@@ -32,6 +32,7 @@ export function DeleteServiceVersion(service, version) {
         method: 'delete'
     })
 }
+
 export function RemoveService(service) {
     return request({
         url: '/deploy/groovyzips?s=' + service,
@@ -76,9 +77,9 @@ export function GetServerVersions(data) {
         method: 'get'
     })
 }
-export function GetWebVersions(data) {
+export function GetWebVersions(webName, projectName) {
     return request({
-        url: '/deploy/serverweb/web/' + data,
+        url: '/deploy/serverweb/web/' + webName + '/' + projectName,
         method: 'get'
     })
 }
@@ -95,3 +96,23 @@ export function ReloadContainer(data) {
         data: data
     })
 }
+export function DeleteContainer(server) {
+    return request({
+        url: '/deploy/container/' + server,
+        method: 'delete'
+    })
+}
+
+export function GetAllWebs() {
+    return request({
+        url: '/deploy/webs',
+        method: 'get'
+    })
+}
+export function GetAllScheduletasks() {
+    return request({
+        url: '/scheduledtasks',
+        method: 'get'
+    })
+}
+

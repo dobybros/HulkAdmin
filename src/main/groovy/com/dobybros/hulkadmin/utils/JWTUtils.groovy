@@ -1,5 +1,6 @@
 package com.dobybros.hulkadmin.utils
 
+import com.alibaba.fastjson.JSONObject
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
 
@@ -13,8 +14,10 @@ class JWTUtils {
         Map<String, Object> map = new HashMap<>();
         map.put("alg", "HS256");
         map.put("typ", "JWT");
+        JSONObject jsonObject = new JSONObject()
+        jsonObject.put("account", account)
         String token = Jwts.builder().setHeader(map)
-                        .claim("account", account)
+                        .setClaims(jsonObject)
                         .setIssuedAt(new Date())
                         .setExpiration(new Date(System.currentTimeMillis() + expireTime))
                         .signWith(SignatureAlgorithm.HS256, secretkey)

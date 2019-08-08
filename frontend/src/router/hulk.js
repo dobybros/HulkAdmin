@@ -37,6 +37,12 @@ export default {
             meta: {...meta, title: `Deploy Service Version`}
         },
         {
+            path: `deployuploadweb`,
+            name: `${pre}/deployuploadweb`,
+            component: _import('hulk/deployuploadweb/index'),
+            meta: {...meta, title: `Deploy Upload Web`}
+        },
+        {
             path: `deployreloadcontainer`,
             name: `${pre}/deployreloadcontainer`,
             component: _import('hulk/deployreloadcontainer/index'),
@@ -47,6 +53,12 @@ export default {
             name: `${pre}/deployreloadnginx`,
             component: _import('hulk/deployreloadnginx/index'),
             meta: {...meta, title: `Deploy Reload Nginx`}
+        },
+        {
+            path: `Scheduledtasks`,
+            name: `${pre}/scheduledtasks`,
+            component: _import('hulk/scheduledtasks/index'),
+            meta: {...meta, title: `Scheduledtasks`}
         }
     ])('hulk-admin-')
 }

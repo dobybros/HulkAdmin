@@ -30,14 +30,22 @@
                             <el-button
                                     @click.native.prevent="openUploadDialog(scope.row)"
                                     type="primary"
-                                    size="medium">
+                                    size="medium"
+                                    style="margin-right: 20px">
                                 {{$t("views.deploy.edit")}}
                             </el-button>
                             <el-button
                                     @click.native.prevent="openDeleteDialog(scope.$index, scope.row)"
                                     type="danger"
-                                    size="medium">
+                                    size="medium"
+                                    style="margin-right: 20px">
                                 {{$t("views.deploy.delete")}}
+                            </el-button>
+                            <el-button
+                                    @click.native.prevent="openDownloadDialog(scope.row)"
+                                    type="primary"
+                                    size="medium">
+                                {{$t("views.deploy.download")}}
                             </el-button>
                         </template>
                     </el-table-column>
@@ -84,7 +92,8 @@
 
                 <span class="cancel-delete">
                     <el-button size="medium" @click="cancelEdit">{{$t("views.deploy.cancel")}}</el-button>
-                    <el-button size="medium" type="danger" @click="deleteServiceVersion">{{$t("views.deploy.delete")}}</el-button>
+                    <el-button size="medium" type="danger"
+                               @click="deleteServiceVersion">{{$t("views.deploy.delete")}}</el-button>
                 </span>
 
   </span>
@@ -93,18 +102,52 @@
                 :title="$t('views.deploy.reminder')"
                 :visible.sync="deleteGroovyDialogVisible"
                 width="30%">
-            <span>{{$t("views.deploy.confrimDeleteService")}}<span style="color: #000fff">{{this.deleteServiceName}}</span>?</span>
+            <span>{{$t("views.deploy.confrimDeleteService")}}<span
+                    style="color: #000fff">{{this.deleteServiceName}}</span>?</span>
             <span slot="footer" class="dialog-footer">
                 <el-button @click="cancelDelete">{{$t("views.deploy.cancel")}}</el-button>
                 <el-button type="primary" @click="sureDelete">{{$t("views.deploy.sure")}}</el-button>
              </span>
         </el-dialog>
+        <el-dialog
+                :visible.sync="downDialogVisible"
+                width="50%"
+        >
+            <el-row>
+                <el-col :span="10">
+                    <el-input v-model="downloadServiceName" :disabled="true">
+                        <template slot="prepend">{{$t("views.deploy.serviceName")}}</template>
+                    </el-input>
+                </el-col>
+                <el-col :span="4">
+                    <el-input :disabled="true" placeholder="version"></el-input>
+                </el-col>
+                <el-col :span="5">
+                    <el-select v-model="downValue" placeholder="Select Version">
+                        <el-option
+                                v-for="item in this.downloadData.versions"
+                                :key="item.value"
+                                :label="item.value"
+                                :value="item.value">
+                        </el-option>
+                    </el-select>
+                </el-col>
+            </el-row>
 
+            <span slot="footer">
+                <span >
+                    <el-button size="medium" @click="cancelDownoad" style="margin-right: 10px">{{$t("views.deploy.cancel")}}</el-button>
+                    <a style="color: #0000cc;border-color: #000fff" target="_blank" @click="downDialogVisible=false" :href="downloadGroovyUrl + '/open/downzip?s='+ downloadServiceName + '&v=' + downValue" ><el-button type="success">{{$t("views.deploy.download")}}</el-button></a>
+                </span>
+
+  </span>
+        </el-dialog>
     </el-container>
 </template>
 <script>
     import {GetAllGroovyInfo, DeleteServiceVersion, RemoveService} from "@api/deploy.api";
     import util from '@/libs/util'
+
     export default {
         data() {
             return {
@@ -114,10 +157,15 @@
                 value: '',
                 dialogVisible: false,
                 deleteGroovyDialogVisible: false,
+                downDialogVisible: false,
                 everyData: {},
                 fileList: [],
                 param: {},
-                deleteServiceName: ''
+                deleteServiceName: '',
+                downloadData: {},
+                downValue: '',
+                downloadServiceName: '',
+                downloadGroovyUrl: ''
             }
         },
         created() {
@@ -212,6 +260,9 @@
                         }
                         this.dialogVisible = false
                         this.$refs.upload.uploadFiles = []
+                        this.value = ''
+                        this.uploadUrlData = ''
+                        this.serviceName = ''
                     } else {
                         this.$message.error('Please select a file to upload!');
                     }
@@ -225,6 +276,10 @@
             },
             cancelEdit() {
                 this.dialogVisible = false
+                this.everyData = {}
+                this.value = ''
+                this.uploadUrlData = ''
+                this.serviceName = ''
                 this.$refs.upload.uploadFiles = []
             },
             deleteServiceVersion() {
@@ -274,6 +329,7 @@
                             }
                         }
                         this.dialogVisible = false
+                        this.deleteServiceName = ''
                     })
                     .catch(err => {
                         this.$message.error(err);
@@ -318,13 +374,32 @@
                 this.removeService(this.deleteServiceName)
                 this.deleteServiceName = ""
             },
+            cancelDownoad(){
+                this.downDialogVisible = false
+                this.downloadData = {}
+                this.downValue = ''
+                this.downloadServiceName = ''
+            },
+            openDownloadDialog(data){
+                this.downDialogVisible = true
+                this.downloadData = data
+                this.downloadServiceName = data.serviceName
+                this.downValue = ''
+                let uploadHost = ''
+                if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
+                    uploadHost = location.protocol + "//" + location.host
+                } else {
+                    uploadHost = process.env.VUE_APP_API
+                }
+                this.downloadGroovyUrl = uploadHost
+            }
         },
         computed: {
             uploadUrlData: function () {
                 let uploadHost = ''
-                if(process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined){
+                if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
                     uploadHost = location.protocol + "//" + location.host
-                }else {
+                } else {
                     uploadHost = process.env.VUE_APP_API
                 }
                 let param = uploadHost + this.uploadUrl + "?s=" + this.serviceName + "&v=" + this.value
@@ -337,7 +412,7 @@
 
 <style scoped>
     /*.dialog-footer {*/
-        /*display: flex;*/
+    /*display: flex;*/
     /*}*/
 
     .uploader {

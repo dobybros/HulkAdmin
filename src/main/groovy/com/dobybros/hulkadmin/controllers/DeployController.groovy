@@ -1,17 +1,23 @@
 package com.dobybros.hulkadmin.controllers
 
+import chat.logs.LoggerEx
 import com.dobybros.hulkadmin.config.ApplicationConfig
-import com.dobybros.hulkadmin.remoteService.discovery.*
+import com.dobybros.hulkadmin.config.NginxConfig
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
+import com.docker.data.DockerStatus
+import com.docker.data.ServiceVersion
 import com.docker.file.adapters.GridFSFileHandler
-import com.docker.rpc.remote.stub.ServiceStubManager
+import com.docker.storage.adapters.impl.DockerStatusServiceImpl
+import com.docker.storage.adapters.impl.ServersServiceImpl
+import com.docker.storage.adapters.impl.ServiceVersionServiceImpl
 import com.mongodb.BasicDBObject
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang.StringUtils
 import org.bson.Document
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.web.bind.annotation.*
 import script.file.FileAdapter
 
@@ -23,18 +29,27 @@ import java.util.regex.Pattern
 @CrossOrigin
 @RestController
 class DeployController {
+    private static final String TAG = DeployController.class.getSimpleName()
     private final String nginxFileName = "nginx.conf"
     @Autowired
     ApplicationConfig applicationConfig
     @Autowired
-    ServiceStubManager serviceStubManager
+    NginxConfig nginxConfig
     @Autowired
     GridFSFileHandler fileAdapter
+    @Autowired
+    RedisTemplate redisTemplate
+    @Autowired
+    ServersServiceImpl serversService
+    @Autowired
+    DockerStatusServiceImpl dockerStatusService
+    @Autowired
+    ServiceVersionServiceImpl serviceVersionService
+
 
     @PostMapping("/serverconfig")
     def addConfig(@RequestBody Document config) {
         Document configFinal = new Document()
-        ServersConfigService serversService = serviceStubManager.getService(ServersConfigService.SERVICE, ServersConfigService.class)
         if (config != null) {
             for (String key : config.keySet()) {
                 if (!StringUtils.isEmpty(key)) {
@@ -45,16 +60,18 @@ class DeployController {
                 }
             }
         }
-        return serversService.updateConfig(configFinal)
+        if (!configFinal.isEmpty()) {
+            serversService.deleteServerConfig(new Document().append("_id", configFinal.get("_id")))
+            serversService.addServerConfig(configFinal)
+        }
     }
 
     @GetMapping("/serverconfig")
     def getConfigs() {
-        ServersConfigService serversService = serviceStubManager.getService(ServersConfigService.SERVICE, ServersConfigService.class)
         List list = new ArrayList()
         Map mapInternal = null
         Map map = null
-        List<Document> configs = serversService.getConfigs()
+        List<Document> configs = serversService.getServerConfigs()
         for (int i = 0; i < configs.size(); i++) {
             Document document = configs.get(i)
             map = new HashMap()
@@ -71,8 +88,7 @@ class DeployController {
 
     @DeleteMapping("/serverconfig/{serviceName}")
     def deleteConfig(@PathVariable String serviceName) {
-        ServersConfigService serversService = serviceStubManager.getService(ServersConfigService.SERVICE, ServersConfigService.class)
-        return serversService.deleteConfig(serviceName)
+        return serversService.deleteServerConfig((new Document().append("_id", serviceName)))
     }
 
     @GetMapping("/groovyzips")
@@ -180,8 +196,7 @@ class DeployController {
 
     @GetMapping("/serviceversions")
     def getAllServiceVersions() {
-        ServiceVersionService serviceVersionService = serviceStubManager.getService(ServiceVersionService.SERVICE, ServiceVersionService.class)
-        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersions()
+        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
         List<Map> list = new ArrayList<>()
         Map<String, Map<String, String>> serviceVersionsMap = null
         Map map = null
@@ -263,23 +278,72 @@ class DeployController {
         if (serviceVersionFinal.size() > 0) {
             serviceVersion.serviceVersions = serviceVersionFinal
         }
-        ServiceVersionService serviceVersionService = serviceStubManager.getService(ServiceVersionService.SERVICE, ServiceVersionService.class)
         serviceVersionService.addServiceVersion(serviceVersion)
     }
 
     @DeleteMapping("/serviceversion")
     def deleteServiceVersion(@RequestParam(value = "i") String id) {
         if (!StringUtils.isEmpty(id)) {
-            ServiceVersionService serviceVersionService = serviceStubManager.getService(ServiceVersionService.SERVICE, ServiceVersionService.class)
-            serviceVersionService.deleteServiceVersion(id)
+            serviceVersionService.deleteServiceVersion(new Document().append("_id", id))
+        }
+    }
+
+    @GetMapping("/webs")
+    def getWebs() {
+        int count = 1
+        List<Map> nginxList = new ArrayList()
+        Map nginxMap;
+        while (nginxConfig.nginx?.get("ip" + count) != null) {
+            nginxMap = new HashMap()
+            nginxMap.put("ip", nginxConfig.nginx?.get("ip" + count))
+            nginxList.add(nginxMap)
+            count++
+        }
+        if (nginxList.size() > 0) {
+            ShellClient sshClient = new ShellClient(nginxConfig.nginx.get("ip1"), nginxConfig.nginx.get("account1"), nginxConfig.nginx.get("passwd1"), Integer.valueOf(nginxConfig.nginx.get("port1")))
+            List webFilenames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath)
+            List webFileList = new ArrayList()
+            Map webFileMap
+            if (webFilenames != null && !webFilenames.isEmpty()) {
+                List webFilenameList = new ArrayList()
+                Map webFileNameMap
+                for (String webFileName : webFilenames) {
+                    webFileNameMap = new HashMap()
+                    List projectFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webFileName)
+                    if (projectFileNames != null && !projectFileNames.isEmpty()) {
+                        Map projectFileNameMap
+                        List projectFileNameList = new ArrayList()
+                        for (String projectFileName : projectFileNames) {
+                            projectFileNameMap = new HashMap()
+                            List projectFileNameVersions = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webFileName + "/" + projectFileName)
+                            Map projectFileNameVersionsMap = new HashMap()
+                            if (projectFileNameVersions != null && !projectFileNameVersions.isEmpty()) {
+                                List projectFileNameVersionList = sortWebVersion(projectFileNameVersions)
+                                projectFileNameMap.put("projectName", projectFileName)
+                                projectFileNameMap.put("lastUploadTime", projectFileNameVersionList.get(0))
+
+                            }
+                            projectFileNameList.add(projectFileNameMap)
+                        }
+                        if (projectFileNameMap != null && !projectFileNameMap.isEmpty()) {
+                            webFileNameMap.put("webName", webFileName)
+                            webFileNameMap.put("projectNames", projectFileNameList)
+                        }
+                    }
+                    webFilenameList.add(webFileNameMap)
+                }
+                if (!webFilenameList.isEmpty()) {
+                    return webFilenameList
+                }
+            }
         }
     }
 
     @GetMapping("/serverweb")
     def getServerWeb() {
         Map serverWebMap = new HashMap()
-        ServiceVersionService serviceVersionService = serviceStubManager.getService(ServiceVersionService.SERVICE, ServiceVersionService.class)
-        Map serverServices = serviceVersionService.getServerServices()
+//        ServiceVersionService serviceVersionService = serviceStubManager.getService(ServiceVersionService.SERVICE, ServiceVersionService.class)
+        Map serverServices = redisTemplate.opsForHash().get("SERVICEWEBS", "SERVICEWEBS".hashCode())
         if (serverServices != null && serverServices.size() > 0) {
             List servers = new ArrayList()
             List versions = null
@@ -311,7 +375,7 @@ class DeployController {
                     if (versions.size() > 0) {
                         Collections.reverse(versions)
                         serverServiceMap.put("serviceName", serverService)
-                        if (serverServices.get(serverService) != null) {
+                        if (serverServices.get(serverService) != null && serverServices.size() > 0) {
                             serverServiceMap.put("currentVersion", Integer.valueOf(serverServices.get(serverService)))
                         }
                         serverServiceMap.put("versions", versions)
@@ -323,44 +387,49 @@ class DeployController {
                 serverWebMap.put("servers", servers)
             }
         }
-        ShellClient sshClient = new ShellClient(applicationConfig.nginxIp, applicationConfig.nginxAccount, applicationConfig.nginxPasswd, Integer.valueOf(applicationConfig.nginxPort))
-        List firstFilenames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath)
+        int count = 1
+        List<Map> nginxList = new ArrayList()
+        Map nginxMap;
+        while (nginxConfig.nginx?.get("ip" + count) != null) {
+            nginxMap = new HashMap()
+            nginxMap.put("ip", nginxConfig.nginx?.get("ip" + count))
+            nginxList.add(nginxMap)
+            count++
+        }
+        if (nginxList.size() > 0) {
+            serverWebMap.put("nginx", nginxList)
+            ShellClient sshClient = new ShellClient(nginxConfig.nginx.get("ip1"), nginxConfig.nginx.get("account1"), nginxConfig.nginx.get("passwd1"), Integer.valueOf(nginxConfig.nginx.get("port1")))
+            List firstFilenames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath)
 //        List firstFilenames = sshClient.excuteCommand("sudo ls /root/aa")
-        List webFileList = new ArrayList()
-        List webFiles = null
-        Map webFileMap = null
-        if (firstFilenames != null && firstFilenames.size() > 0) {
-            //tc這一層
-            for (String firstFileName : firstFilenames) {
-                List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + firstFileName)
-//                List secondFileNames = sshClient.excuteCommand("sudo ls /root/aa" + "/" + firstFileName)
-                if (secondFileNames != null && secondFileNames.size() > 0) {
-                    webFileMap = new HashMap()
-                    webFiles = new ArrayList()
-                    List list = new ArrayList()
-                    List<File> files = new ArrayList<>()
-                    for (String fileName : secondFileNames) {
-                        File file = new File(fileName)
-                        files.add(file)
-                    }
-                    webFiles = files.sort { a, b ->
-                        return b.compareTo(a)
-                    }
-                    for (File file1 : webFiles) {
-                        list.add(file1.getName())
-                    }
-                    if (list.size() > 0) {
-                        webFileMap.put("webName", firstFileName)
-                        if (serverServices.get(firstFileName) != null) {
-                            webFileMap.put("currentVersion", serverServices.get(firstFileName))
+            List webFileList = new ArrayList()
+            List webFiles = null
+            Map webFileMap = null
+            if (firstFilenames != null && firstFilenames.size() > 0) {
+                //tc這一層
+                for (String firstFileName : firstFilenames) {
+                    List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + firstFileName)
+                    if (secondFileNames != null && secondFileNames.size() > 0) {
+                        Map projectMap
+                        for (String secondFileName : secondFileNames) {
+                            projectMap = new HashMap()
+                            projectMap.put("webName", firstFileName)
+                            projectMap.put("projectName", secondFileName)
+                            if (serverServices != null) {
+                                if (serverServices.get(firstFileName + "#" + secondFileName) != null) {
+                                    projectMap.put("currentVersion", serverServices.get(firstFileName + "#" + secondFileName))
+                                }
+                            }
+                            List thirdFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + firstFileName + "/" + secondFileName)
+                            if (thirdFileNames != null && !thirdFileNames.isEmpty()) {
+                                projectMap.put("versions", sortWebVersion(thirdFileNames))
+                            }
+                            webFileList.add(projectMap)
                         }
-                        webFileMap.put("versions", list)
-                        webFileList.add(webFileMap)
                     }
                 }
-            }
-            if (webFileList.size() > 0) {
-                serverWebMap.put("webs", webFileList)
+                if (webFileList.size() > 0) {
+                    serverWebMap.put("webs", webFileList)
+                }
             }
         }
         return serverWebMap
@@ -397,125 +466,156 @@ class DeployController {
         }
     }
 
-    @GetMapping("/serverweb/web/{webName}")
-    def getWebVersionsByWebName(@PathVariable String webName) {
-        ShellClient sshClient = new ShellClient(applicationConfig.nginxIp, applicationConfig.nginxAccount, applicationConfig.nginxPasswd, Integer.valueOf(applicationConfig.nginxPort))
-        List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webName)
+    @GetMapping("/serverweb/web/{webName}/{projectName}")
+    def getWebVersionsByWebName(@PathVariable String webName, @PathVariable String projectName) {
+        ShellClient sshClient = new ShellClient(nginxConfig.nginx.get("ip1"), nginxConfig.nginx.get("account1"), nginxConfig.nginx.get("passwd1"), Integer.valueOf(nginxConfig.nginx.get("port1")))
+        List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webName + "/" + projectName)
 //        List secondFileNames = sshClient.excuteCommand("sudo ls /root/aa" + "/" + webName)
         if (secondFileNames != null && secondFileNames.size() > 0) {
-            List webFiles = new ArrayList()
-            List list = new ArrayList()
-            List<File> files = new ArrayList<>()
-            for (String fileName : secondFileNames) {
-                File file = new File(fileName)
-                files.add(file)
-            }
-            webFiles = files.sort { a, b ->
-                return b.compareTo(a)
-            }
-            for (File file1 : webFiles) {
-                list.add(file1.getName())
-            }
-            return list
+            secondFileNames = sortWebVersion(secondFileNames)
+            return secondFileNames
         }
     }
 
     @PostMapping("/serverweb")
     def reloadNginx(@RequestBody Map map) {
-        SftpClient sftpClient = new SftpClient(applicationConfig.nginxIp, applicationConfig.nginxAccount, applicationConfig.nginxPasswd, Integer.valueOf(applicationConfig.nginxPort))
-        ShellClient sshClient = new ShellClient(applicationConfig.nginxIp, applicationConfig.nginxAccount, applicationConfig.nginxPasswd, Integer.valueOf(applicationConfig.nginxPort))
-        sftpClient.download(applicationConfig.nginxRemotePath, "nginx.conf", "./nginx.conf")
-        if (map != null && map.size() > 0) {
-            Map serverServices = new HashMap()
-            String originPath = applicationConfig.nginxPath + nginxFileName
-            String nginxContent = FileUtils.readFileToString(new File(originPath), "utf8")
-            // replace html path
-            List<Map> webs = map.get("webs")
-            if (webs != null) {
-                for (Map webMap : webs) {
-                    String webName = webMap.get("webName")
-                    String currentVersion = null
-                    if (webMap.get("currentVersion") != null) {
-                        currentVersion = webMap.get("currentVersion").toString()
-                    }
-                    if (!StringUtils.isEmpty(webName) && !StringUtils.isEmpty(currentVersion)) {
-                        String originalPre = applicationConfig.nginxWwwPath + "/" + webName.replaceAll(" ", "") + "/"
-                        String replacePath = applicationConfig.nginxWwwPath + "/" + webName.replaceAll(" ", "") + "/" + currentVersion.replaceAll(" ", "") + ";"
-                        Pattern pattern = Pattern.compile(originalPre + ".*?;")
-                        Matcher matcher = pattern.matcher(nginxContent)
-                        nginxContent = matcher.replaceAll(replacePath)
-                        serverServices.put(webName, currentVersion)
-                    }
+        String nginxIp = map.get("ip")
+        if (!StringUtils.isEmpty(nginxIp)) {
+            int count = 1
+            String nginxAccount = null
+            String nginxPort = null
+            String nginxPasswd = null
+            while (nginxConfig.nginx?.get("ip" + count) != null) {
+                if (nginxIp.equals(nginxConfig.nginx?.get("ip" + count))) {
+                    nginxPort = nginxConfig.nginx?.get("port" + count)
+                    nginxAccount = nginxConfig.nginx?.get("account" + count)
+                    nginxPasswd = nginxConfig.nginx?.get("passwd" + count)
+                    break
+                } else {
+                    count++
                 }
             }
-            // replace server version
-            List<Map> servers = map.get("servers")
-            if (servers != null) {
-                for (Map serverMap : servers) {
-                    String serviceName = serverMap.get("serviceName")
-                    String currentVersion = null
-                    if (serverMap.get("currentVersion") != null) {
-                        currentVersion = serverMap.get("currentVersion").toString()
+            if (nginxPort != null && nginxAccount != null && nginxPasswd != null) {
+                SftpClient sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+                sftpClient.download(applicationConfig.nginxRemotePath, "nginx.conf", applicationConfig.nginxPath + "nginx.conf")
+                LoggerEx.info("DeployController", "Download nginx.conf success,path: " + applicationConfig.nginxPath + "nginx.conf")
+                if (map != null && map.size() > 0) {
+                    Map serverServices = new HashMap()
+                    String originPath = applicationConfig.nginxPath + nginxFileName
+                    String nginxContent = FileUtils.readFileToString(new File(originPath), "utf8")
+                    // replace html path
+                    List<Map> webs = map.get("webs")
+                    if (webs != null) {
+                        for (Map webMap : webs) {
+                            String webName = webMap.get("webName")
+                            String projectName = webMap.get("projectName")
+                            String currentVersion = null
+                            if (webMap.get("currentVersion") != null) {
+                                currentVersion = webMap.get("currentVersion").toString()
+                            }
+                            if (!StringUtils.isEmpty(webName) && !StringUtils.isEmpty(currentVersion) && !StringUtils.isEmpty(projectName)) {
+                                String originalPre = applicationConfig.nginxWwwPath + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/"
+                                String replacePath = applicationConfig.nginxWwwPath + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/" + currentVersion.replaceAll(" ", "") + ";"
+                                Pattern pattern = Pattern.compile(originalPre + ".*?;")
+                                Matcher matcher = pattern.matcher(nginxContent)
+                                nginxContent = matcher.replaceAll(replacePath)
+                                serverServices.put(webName + "#" + projectName, currentVersion)
+                            }
+                        }
                     }
-                    if (!StringUtils.isEmpty(serviceName) && !StringUtils.isEmpty(currentVersion)) {
-                        String originalPre = serviceName.replaceAll(" ", "") + "_v"
-                        String replacePath = serviceName.replaceAll(" ", "") + "_v" + currentVersion.replaceAll(" ", "") + ";"
-                        Pattern pattern = Pattern.compile(originalPre + ".*?;")
-                        Matcher matcher = pattern.matcher(nginxContent)
-                        nginxContent = matcher.replaceAll(replacePath)
-                        serverServices.put(serviceName, currentVersion)
+                    // replace server version
+                    List<Map> servers = map.get("servers")
+                    if (servers != null) {
+                        for (Map serverMap : servers) {
+                            String serviceName = serverMap.get("serviceName")
+                            String currentVersion = null
+                            if (serverMap.get("currentVersion") != null) {
+                                currentVersion = serverMap.get("currentVersion").toString()
+                            }
+                            if (!StringUtils.isEmpty(serviceName) && !StringUtils.isEmpty(currentVersion)) {
+                                String originalPre = serviceName.replaceAll(" ", "") + "_v"
+                                String replacePath = serviceName.replaceAll(" ", "") + "_v" + currentVersion.replaceAll(" ", "")
+                                int index = nginxContent.indexOf(originalPre)
+                                if (index != -1) {
+                                    String oldVersion = ''
+                                    for (int i = 0; i < 4; i++) {
+                                        if(StringUtils.isNumeric(nginxContent.charAt(index + originalPre.size() + i).toString())){
+                                            oldVersion += nginxContent.charAt(index + originalPre.size() + i).toString()
+                                        }else {
+                                            break
+                                        }
+                                    }
+                                    if(oldVersion != null){
+                                        nginxContent = nginxContent.replaceAll(originalPre + oldVersion, replacePath)
+                                        serverServices.put(serviceName, currentVersion)
+                                    }
+                                }
+                            }
+                        }
                     }
+                    // write content to temp file
+                    String targetTime = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss") + "target"
+                    def targetDir = originPath + "_" + targetTime
+                    FileUtils.writeStringToFile(new File(targetDir), nginxContent, "utf8")
+                    try {
+                        sftpClient.upload(targetDir, applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime)
+                    }catch(Throwable t){
+                        LoggerEx.error(TAG, "Upload file failed!!! err: " + t.getMessage())
+                    }
+                    LoggerEx.info("DeployController", "upload nginx target.conf success,path: " + applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime)
+                    // check nginx config
+                    ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+                    try {
+                        sshClient.excuteCommand("sudo docker exec nginx nginx -tc $targetDir")
+                    } catch (Throwable t) {
+                        FileUtils.deleteQuietly(new File(targetDir))
+                        sftpClient.close()
+                        LoggerEx.error(TAG, "Manage exec nginx failed!!! error: " + t.getMessage())
+                        throw t
+                    }
+////             rename original nginx fileName,   reload file
+                    String nginxBak = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
+                    try {
+                        sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + " " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak)
+                        LoggerEx.info("DeployController", "mv old nginx.conf success,path: " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak)
+                        Thread.sleep(1000)
+                        sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime + " " + applicationConfig.nginxRemotePath + nginxFileName)
+                        LoggerEx.info("DeployController", "mv new nginx.conf success,path: " + applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime + "to" + applicationConfig.nginxRemotePath + nginxFileName)
+                        sshClient.excuteCommand("sudo docker exec nginx nginx -s reload")
+                    } catch (Throwable t) {
+                        FileUtils.deleteQuietly(new File(originPath))
+                        FileUtils.deleteQuietly(new File(targetDir))
+                        sshClient.excuteCommand("sudo rm -rf " + applicationConfig.nginxRemotePath + nginxFileName)
+                        sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak + " " + applicationConfig.nginxRemotePath + nginxFileName)
+                        sftpClient.close()
+                        LoggerEx.error(TAG, "Manage nginx.conf failed!!! error: " + t.getMessage())
+                        throw t
+                    }
+                    if (serverServices.size() > 0) {
+                        redisTemplate.opsForHash().put("SERVICEWEBS", "SERVICEWEBS".hashCode(), serverServices)
+                    }
+                    sftpClient.close()
+                    FileUtils.deleteQuietly(new File(originPath))
+                    FileUtils.deleteQuietly(new File(targetDir))
                 }
             }
-            // write content to temp file
-            String targetTime = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss") + "target"
-            def targetDir = originPath + "_" + targetTime
-            FileUtils.writeStringToFile(new File(targetDir), nginxContent, "utf8")
-            sftpClient.upload(targetDir, applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime)
-            // check nginx config
-            try {
-                sshClient.excuteCommand("sudo docker exec nginx nginx -tc $targetDir")
-            } catch (Exception e) {
-                FileUtils.deleteQuietly(new File(targetDir))
-                sftpClient.close()
-                throw e
-            }
-//             rename original nginx fileName,   reload file
-            String nginxBak = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
-            try {
-                sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + " " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak)
-                Thread.sleep(1000)
-                sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + targetDir + " " + applicationConfig.nginxRemotePath + nginxFileName)
-                sshClient.excuteCommand("sudo docker exec nginx nginx -s reload")
-            } catch (Exception e) {
-                FileUtils.deleteQuietly(new File(originPath))
-                FileUtils.deleteQuietly(new File(targetDir))
-                sshClient.excuteCommand("sudo rm -rf " + applicationConfig.nginxRemotePath + nginxFileName)
-                sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak + " " + applicationConfig.nginxRemotePath + nginxFileName)
-                sftpClient.close()
-                throw e
-            }
-            if (serverServices.size() > 0) {
-                ServiceVersionService serviceVersionService = serviceStubManager.getService(ServiceVersionService.SERVICE, ServiceVersionService.class)
-                serviceVersionService.addServerServices(serverServices)
-            }
-            sftpClient.close()
-            FileUtils.deleteQuietly(new File(originPath))
-            FileUtils.deleteQuietly(new File(targetDir))
         }
     }
 
     @GetMapping("/containers")
     def getAllContainers() {
-        DockerStatusService dockerStatusService = serviceStubManager.getService(DockerStatusService.SERVICE, DockerStatusService.class)
-        List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatuses()
+        List<DockerStatus> dockerStatuses = dockerStatusService.getAllDockerStatus()
         return dockerStatuses
+    }
+
+    @DeleteMapping("/container/{server}")
+    def deleteContainer(@PathVariable String server) {
+        dockerStatusService.deleteDockerStatus(server)
     }
 
     @PostMapping("/container")
     def reloadContainer(@RequestBody DockerStatus dockerStatus) {
         if (dockerStatus != null) {
-            DockerStatusService dockerStatusService = serviceStubManager.getService(DockerStatusService.SERVICE, DockerStatusService.class)
             if (dockerStatus.server != null && dockerStatus.ip != null && dockerStatus.dockerName != null) {
                 InputStream inStream = DeployController.class.getClassLoader().getResourceAsStream("application.properties");
                 Properties prop = new Properties();
@@ -536,11 +636,32 @@ class DeployController {
                     if (StringUtils.isEmpty(passwd)) {
                         passwd = ""
                     }
+                    try {
+                        dockerStatusService.deleteDockerStatus(dockerStatus.server)
+                    }catch(Throwable t){
+                        LoggerEx.error(TAG, t.getMessage())
+                    }
                     ShellClient sshClient = new ShellClient(ip, account, passwd, Integer.valueOf(port))
-                    dockerStatusService.deleteDockerStatus(dockerStatus.server)
-                    sshClient.excuteCommand("sudo docker restart " + dockerStatus.dockerName)
+                    try {
+                        sshClient.excuteCommand("sudo docker restart " + dockerStatus.dockerName)
+                    }catch(Throwable t){
+                        LoggerEx.error(DeployController.class.getSimpleName(), "Reload container failed!!! err: " + t.message)
+                    }
                 }
             }
         }
+    }
+
+    private List sortWebVersion(List fileNames) {
+        List projectFileNameVersionLongList = new ArrayList()
+        for (String projectFileNameVersion : fileNames) {
+            projectFileNameVersionLongList.add(TimeUtils.getDateLong(projectFileNameVersion, "yyyy_MM_dd_HH_mm_ss"))
+        }
+        Collections.reverse(projectFileNameVersionLongList)
+        List projectFileNameVersionList = new ArrayList()
+        for (Long projectFileNameVersionLong : projectFileNameVersionLongList) {
+            projectFileNameVersionList.add(TimeUtils.getDateString(projectFileNameVersionLong, "yyyy_MM_dd_HH_mm_ss"))
+        }
+        return projectFileNameVersionList
     }
 }

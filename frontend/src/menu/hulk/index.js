@@ -24,6 +24,11 @@ export default {
             icon: 'commenting'
         },
         {
+            path: `${pre}deployuploadweb`,
+            title: 'Deploy Upload Web ',
+            icon: 'commenting'
+        },
+        {
             path: `${pre}deployreloadcontainer`,
             title: 'Deploy Reload Server ',
             icon: 'commenting'
@@ -31,6 +36,11 @@ export default {
         {
             path: `${pre}deployreloadnginx`,
             title: 'Deploy Reload Nginx ',
+            icon: 'commenting'
+        },
+        {
+            path: `${pre}Scheduledtasks`,
+            title: 'Scheduledtasks ',
             icon: 'commenting'
         }
     ])("/hulk/")

@@ -35,15 +35,18 @@ class ApplicationConfig {
     public String nginxPath
     @Value('${nginx.remotePath}')
     public String nginxRemotePath
-    @Value('${nginx.account}')
-    public String nginxAccount
-    @Value('${nginx.passwd}')
-    public String nginxPasswd
-    @Value('${nginx.ip}')
-    public String nginxIp
-    @Value('${nginx.port}')
-    public String nginxPort
     @Value('${token.expire.time}')
     public String tokenExpireTime
-
+    @Value('${dockerstatus.dbname}')
+    public String dockerStatusDBName
+    @Value('${config.dbname:}')
+    public String configDBName
+    @Value('${connectionsPerHost}')
+    public String connectionsPerHost
+    @Value('${mongo.username}')
+    public String mongoUserName
+    @Value('${mongo.password}')
+    public String mongoPassword
+    @Value('${database.host}')
+    public String databaseHost
 }

@@ -144,7 +144,7 @@
     },
     "deploy": {
       "newServiceConfig": "New Service Config",
-      "edit": "edit",
+      "edit": "Edit",
       "delete": "Delete",
       "cancel": "Cancel",
       "save": "Save",
@@ -159,11 +159,17 @@
       "confirmConfig":  " config?",
       "server": "server",
       "web": "web",
+      "nginx": "nginx",
       "serviceName": "service name",
+      "projectName": "project name",
       "confrimDeleteService": "Confirm delete service ",
       "reminder": "Reminder",
       "version": "version",
-      "webName": "web name"
+      "webName": "web name",
+      "lastUploadTime": "recently uploaded time",
+      "newWeb": "New Web",
+      "add": "Add",
+      "download": "Download"
     },
     "system": {
       "error": {

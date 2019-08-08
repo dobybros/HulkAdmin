@@ -44,7 +44,7 @@ class ShellClient {
 
         Session session = createSession(jsch, host, userName, port)
         session.setPassword(password)
-        session.connect(2000)
+        session.connect(20000)
 
         ChannelExec channel = (ChannelExec)session.openChannel("exec")
         channel.setCommand(execCmd)

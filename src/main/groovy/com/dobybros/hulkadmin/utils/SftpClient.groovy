@@ -7,6 +7,7 @@ import com.jcraft.jsch.ChannelSftp
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.JSchException
 import com.jcraft.jsch.Session
+import com.jcraft.jsch.SftpException
 
 /**
  * Created by lick on 2019/6/23.
@@ -28,7 +29,7 @@ class SftpClient {
         try {
             // 创建sftp通信通道
             sftp = session.openChannel(SFTP_PROTOCAL);
-            sftp.connect(1000);
+            sftp.connect(50000);
         } catch (JSchException e) {
             e.printStackTrace()
         }
@@ -56,7 +57,7 @@ class SftpClient {
         try {
             sftp.cd(srcPath);
             File file = new File(saveFile);
-            if(!file.exists()){
+            if (!file.exists()) {
                 file.createNewFile()
             }
             sftp.get(srcfile, new FileOutputStream(file));
@@ -64,6 +65,7 @@ class SftpClient {
             e.printStackTrace()
         }
     }
+
     public void upload(String srcFile, String dest) {
         try {
             sftp.put(srcFile, dest);
@@ -71,11 +73,17 @@ class SftpClient {
             e.printStackTrace();
         }
     }
-    public void close(){
-        if(sftp != null){
+
+    public void uploadByStream(String directory, String sftpFileName, InputStream inputStream) {
+        sftp.cd(directory);
+        sftp.put(inputStream, sftpFileName);
+    }
+
+    public void close() {
+        if (sftp != null) {
             sftp.disconnect()
         }
-        if(session != null){
+        if (session != null) {
             session.disconnect()
         }
     }
