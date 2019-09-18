@@ -12,17 +12,12 @@
                         </el-col>
                     </el-row>
                     <el-row v-for="project in web.projectNames" style="display: flex;">
-                        <el-col style="flex: 1;margin-top: 20px;margin-right: 80px">
+                        <el-col style="margin-top: 20px;margin-right: 40px">
                             <el-input v-model="project.projectName" placeholder="Input service name">
                                 <template slot="prepend">{{$t("views.deploy.projectName")}}</template>
                             </el-input>
                         </el-col>
-                        <el-col style="flex: 1;margin-top: 20px;margin-right: 80px">
-                            <el-input :disabled="true" v-model="project.lastUploadTime" size="medium">
-                                <template slot="prepend">{{$t("views.deploy.lastUploadTime")}}</template>
-                            </el-input>
-                        </el-col>
-                        <el-col style="flex: 1;margin-top: 20px;">
+                        <el-col style="flex: 1;margin-top: 20px;margin-right: 120px">
                             <el-upload
                                     accept=".zip"
                                     ref="upload"
@@ -34,6 +29,25 @@
                                 <el-button type="primary">{{$t("views.deploy.upload")}}<i
                                         class="el-icon-upload el-icon--right"></i></el-button>
                             </el-upload>
+                        </el-col>
+                        <el-col :span="15" style="margin-right: 40px;margin-top: 20px">
+                            <el-select v-model="project.selectVersion"
+                                       placeholder="Select version">
+                                <el-option
+                                        v-for="version in project.versions"
+                                        :key="version"
+                                        :label="version"
+                                        :value="version">
+                                </el-option>
+                            </el-select>
+                        </el-col>
+                        <el-col style="margin-top: 20px">
+                            <el-button
+                                    type="danger"
+                                    size="medium"
+                                    @click="deleteWebProjectVersion(web.webName, project.projectName, project.selectVersion)">
+                                {{$t("views.deploy.delete")}}
+                            </el-button>
                         </el-col>
                     </el-row>
                     <el-row style="margin: 15px 0;">
@@ -72,7 +86,7 @@
     </el-container>
 </template>
 <script>
-    import {GetAllWebs} from "@api/deploy.api";
+    import {GetAllWebs, DeleteWebProjectVersion} from "@api/deploy.api";
 
     export default {
         data() {
@@ -83,7 +97,9 @@
                 param: {},
                 dialogUploadWeb: false,
                 webName: '',
-                projectName: ''
+                projectName: '',
+                selectVersion: '',
+                downloadGroovyUrl: ''
             }
         },
         methods: {
@@ -110,7 +126,7 @@
             addWeb() {
                 this.webs.push({
                     "webName": this.webName,
-                    "projectNames": [{"projectName": this.projectName, "lastUploadTime": ''}]
+                    "projectNames": [{"projectName": this.projectName, "versions": []}]
                 })
                 this.webName = '',
                     this.projectName = ''
@@ -132,6 +148,33 @@
                         projectNames.push({"projectName": '', "lastUploadTime": ''})
                     }
                 }
+            },
+            deleteWebProjectVersion(webName, projectName, version) {
+                DeleteWebProjectVersion(webName, projectName, version)
+                    .then(resp => {
+                        this.$message.success("Success delete " + webName + " " + projectName + " " + version)
+                        for (let i = 0; i < this.webs.length; i++) {
+                            let web = this.webs[i]
+                            if (web["webName"] === webName) {
+                                let projectNames = web["projectNames"]
+                                for (let j = 0; j < projectNames.length; j++) {
+                                    let project = projectNames[j]
+                                    if (project["projectName"] === projectName) {
+                                        let versions = project["versions"]
+                                        for (let k = 0; k < versions.length; k++) {
+                                            if (versions[k] === version) {
+                                                versions.splice(k, 1)
+                                                project["selectVersion"] = ''
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
             }
         },
         created() {
@@ -139,6 +182,13 @@
                 .then(resp => {
                     this.$message.success("Updated!")
                     this.webs = resp
+                    let uploadHost = ''
+                    if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
+                        uploadHost = location.protocol + "//" + location.host
+                    } else {
+                        uploadHost = process.env.VUE_APP_API
+                    }
+                    this.downloadGroovyUrl = uploadHost
                 })
                 .catch(err => {
                     this.$message.error(err);

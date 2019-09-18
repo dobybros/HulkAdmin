@@ -116,3 +116,18 @@ export function GetAllScheduletasks() {
     })
 }
 
+export function DownloadAllGroovy(directoryStr) {
+    return request({
+        url: '/deploy/downloadgroovys',
+        method: 'post',
+        data: directoryStr
+    })
+}
+
+export function DeleteWebProjectVersion(webName, projectName, version) {
+    return request({
+        url: '/deploy/web/' + webName + '/' + projectName + '/' + version,
+        method: 'delete'
+    })
+}
+

@@ -1,7 +1,41 @@
 <template>
     <el-container>
         <el-main>
-            <el-button type="primary" round @click="newServiceConfig">{{$t("views.deploy.newServiceConfig")}}</el-button>
+            <el-row>
+                <el-col :span="8" style="margin-top: 20px">
+                    <el-button type="primary" round @click="newServiceConfig">{{$t("views.deploy.newServiceConfig")}}
+                    </el-button>
+                </el-col>
+                <el-col style="flex: 1;margin-top: 20px;margin-right: 120px" :span="4">
+                    <el-upload
+                            ref="upload"
+                            :action="uploadConfig()"
+                            :on-success="uploadSuccess"
+                            :file-list="fileList"
+                            :limit="1"
+                            :auto-upload="true">
+                        <el-button type="primary">{{$t("views.deploy.ImportConfig")}}<i
+                                class="el-icon-upload el-icon--right"></i></el-button>
+                    </el-upload>
+                </el-col>
+                <el-col :span="5" style="margin-top: 20px">
+                    <a style="color: #0000cc;border-color: #000fff" target="_blank"
+                       :href="downloadGroovyUrl + '/open/downconfigs'">
+                        <el-button type="success">{{$t("views.deploy.ExportAllConfig")}}</el-button>
+                    </a>
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="14" style="margin-top: 5px;margin-bottom: 10px">
+                    <el-input v-model="exportConfigs" placeholder="Please enter the config name, separated by commas"></el-input>
+                </el-col>
+                <el-col :span="5" style="margin-top: 5px;margin-bottom: 10px">
+                    <a style="color: #0000cc;border-color: #000fff" target="_blank"
+                       :href="downloadGroovyUrl + '/open/downconfigsinput/' + exportConfigs">
+                        <el-button type="success">{{$t("views.deploy.ExportConfig")}}</el-button>
+                    </a>
+                </el-col>
+            </el-row>
             <el-table
                     :data="tableData"
                     border
@@ -17,7 +51,9 @@
                         label="Operations"
                         width="400">
                     <template slot-scope="scope">
-                        <el-button type="primary" size="medium" @click="dialogTableVisible(scope.row)">{{$t("views.deploy.edit")}}</el-button>
+                        <el-button type="primary" size="medium" @click="dialogTableVisible(scope.row)">
+                            {{$t("views.deploy.edit")}}
+                        </el-button>
                         <el-button
                                 @click.native.prevent="openDeleteDialog(scope.$index, scope.row, tableData)"
                                 type="danger"
@@ -151,9 +187,9 @@
                     this.$set(this.addDataCache, key, {key: key, value: value})
                     this.$delete(this.everyData, "")
                     let keyData = this.everyData[key]["key"]
-                    for(let name in this.everyData){
-                        if(this.everyData[name]["key"] === keyData){
-                            if(name !== keyData){
+                    for (let name in this.everyData) {
+                        if (this.everyData[name]["key"] === keyData) {
+                            if (name !== keyData) {
                                 this.$delete(this.everyData, name)
                             }
                         }
@@ -165,6 +201,17 @@
                 this.deleteConfigName = data["_id"]["value"]
                 this.index = index
             },
+            uploadConfig: function () {
+                let param = this.downloadGroovyUrl + this.uploadUrl
+                return param
+            },
+            uploadSuccess(res, file, fileList) {
+                if (res.code === 1) {
+                    this.$message.success("Import config success!")
+                } else {
+                    this.$message.error("Import config failed!")
+                }
+            },
             sureDelete() {
                 this.deleteDialogVisible = false
                 this.removeConfig(this.deleteConfigName)
@@ -172,6 +219,7 @@
         },
         data() {
             return {
+                uploadUrl: '/open/config',
                 configName: "",
                 index: -1,
                 deleteConfigName: "",
@@ -180,7 +228,10 @@
                 addDataCache: {},
                 tableData: [],
                 dialogFormVisible: false,
-                deleteDialogVisible: false
+                deleteDialogVisible: false,
+                downloadGroovyUrl: '',
+                fileList: [],
+                exportConfigs: ''
             }
         },
         created() {
@@ -188,6 +239,13 @@
                 .then(resp => {
                     this.$message.success("Get all config success!")
                     this.tableData = resp
+                    let uploadHost = ''
+                    if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
+                        uploadHost = location.protocol + "//" + location.host
+                    } else {
+                        uploadHost = process.env.VUE_APP_API
+                    }
+                    this.downloadGroovyUrl = uploadHost
                 })
                 .catch(err => {
                     this.$message.error(err);

@@ -3,6 +3,7 @@ package com.dobybros.hulkadmin.controllers
 import chat.logs.LoggerEx
 import com.dobybros.hulkadmin.config.ApplicationConfig
 import com.dobybros.hulkadmin.config.NginxConfig
+import com.dobybros.hulkadmin.general.GeneralException
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
@@ -21,6 +22,8 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.web.bind.annotation.*
 import script.file.FileAdapter
 
+import javax.servlet.http.HttpServletRequest
+import javax.servlet.http.HttpServletResponse
 import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.Matcher
 import java.util.regex.Pattern
@@ -193,7 +196,6 @@ class DeployController {
             fileAdapter.deleteFileRegix(new BasicDBObject("filename", new Document().append("\$regex", applicationConfig.scriptRemotePath + serviceName)))
         }
     }
-
     @GetMapping("/serviceversions")
     def getAllServiceVersions() {
         List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
@@ -320,8 +322,7 @@ class DeployController {
                             if (projectFileNameVersions != null && !projectFileNameVersions.isEmpty()) {
                                 List projectFileNameVersionList = sortWebVersion(projectFileNameVersions)
                                 projectFileNameMap.put("projectName", projectFileName)
-                                projectFileNameMap.put("lastUploadTime", projectFileNameVersionList.get(0))
-
+                                projectFileNameMap.put("versions", projectFileNameVersionList)
                             }
                             projectFileNameList.add(projectFileNameMap)
                         }
@@ -339,6 +340,27 @@ class DeployController {
         }
     }
 
+    @DeleteMapping("/web/{webName}/{projectName}/{version}")
+    def deleteWeb(@PathVariable String webName, @PathVariable String projectName, @PathVariable String version) {
+        int count = 1
+        String nginxAccount = null
+        String nginxPort = null
+        String nginxPasswd = null
+        String nginxIp = null
+        while (nginxConfig.nginx?.get("ip" + count) != null) {
+            nginxIp = nginxConfig.nginx?.get("ip" + count)
+            nginxPort = nginxConfig.nginx?.get("port" + count)
+            nginxAccount = nginxConfig.nginx?.get("account" + count)
+            nginxPasswd = nginxConfig.nginx?.get("passwd" + count)
+            if (nginxIp != null && nginxPort != null && nginxAccount != null && nginxPasswd != null) {
+                String wwwPath = applicationConfig.nginxWwwPath
+                String projectPath = wwwPath + "/" + webName + "/" + projectName
+                ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+                sshClient.excuteCommand("sudo rm -rf " + projectPath + "/" + version)
+            }
+            count++
+        }
+    }
     @GetMapping("/serverweb")
     def getServerWeb() {
         Map serverWebMap = new HashMap()

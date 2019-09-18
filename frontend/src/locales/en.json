@@ -169,7 +169,11 @@
       "lastUploadTime": "recently uploaded time",
       "newWeb": "New Web",
       "add": "Add",
-      "download": "Download"
+      "download": "Download",
+      "downloadAllGroovy": "Download All Groovy",
+      "ExportAllConfig": "Export All Config",
+      "ExportConfig": "Export config",
+      "ImportConfig": "Import Config"
     },
     "system": {
       "error": {

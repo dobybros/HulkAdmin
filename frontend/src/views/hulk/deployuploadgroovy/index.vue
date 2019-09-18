@@ -1,7 +1,15 @@
 <template>
     <el-container>
         <el-main>
-            <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.addNewService")}}</el-button>
+            <el-row>
+                <el-col :span="19">
+                    <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.addNewService")}}</el-button>
+                </el-col>
+                <el-col :span="4">
+                    <a style="color: #0000cc;border-color: #000fff" target="_blank" :href="downloadGroovyUrl + '/open/downzips'" ><el-button type="success">{{$t("views.deploy.downloadAllGroovy")}}</el-button></a>
+                </el-col>
+            </el-row>
+
             <div>
                 <el-table
                         :data="tableData"
@@ -145,7 +153,7 @@
     </el-container>
 </template>
 <script>
-    import {GetAllGroovyInfo, DeleteServiceVersion, RemoveService} from "@api/deploy.api";
+    import {GetAllGroovyInfo, DeleteServiceVersion, RemoveService, DownloadAllGroovy} from "@api/deploy.api";
     import util from '@/libs/util'
 
     export default {
@@ -165,7 +173,8 @@
                 downloadData: {},
                 downValue: '',
                 downloadServiceName: '',
-                downloadGroovyUrl: ''
+                downloadGroovyUrl: '',
+                downloadDirectory: ''
             }
         },
         created() {
@@ -173,6 +182,13 @@
                 .then(resp => {
                     this.$message.success("Updated!")
                     this.tableData = resp
+                    let uploadHost = ''
+                    if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
+                        uploadHost = location.protocol + "//" + location.host
+                    } else {
+                        uploadHost = process.env.VUE_APP_API
+                    }
+                    this.downloadGroovyUrl = uploadHost
                 })
                 .catch(err => {
                     this.$message.error(err);
@@ -385,13 +401,17 @@
                 this.downloadData = data
                 this.downloadServiceName = data.serviceName
                 this.downValue = ''
-                let uploadHost = ''
-                if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
-                    uploadHost = location.protocol + "//" + location.host
-                } else {
-                    uploadHost = process.env.VUE_APP_API
+            },
+            downloadAllGroovy(){
+                if(this.downloadDirectory !== ''){
+                    DownloadAllGroovy(this.downloadDirectory)
+                        .then(resp => {
+                            this.$message.success("Success!")
+                        })
+                        .catch(err => {
+                            this.$message.error(err);
+                        })
                 }
-                this.downloadGroovyUrl = uploadHost
             }
         },
         computed: {
