@@ -137,6 +137,7 @@
         "actions": "Actions",
         "save": "Save"
       },
+      "update": "UPDATE ALL INFO",
       "uploadFileHere": "Drop or select keychain file here to upload",
       "add": "add",
       "new-app": "New App",

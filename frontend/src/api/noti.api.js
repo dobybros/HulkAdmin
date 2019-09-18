@@ -6,6 +6,12 @@ export function GetAllApps() {
     method: 'get'
   })
 }
+export function UpdateAllApps() {
+  return request({
+    url: "/noti/apps/update",
+    method: 'post'
+  })
+}
 export function SaveApp(app) {
   return request({
     url: '/noti/app',
