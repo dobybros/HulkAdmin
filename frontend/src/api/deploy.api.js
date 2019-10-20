@@ -109,9 +109,9 @@ export function GetAllWebs() {
         method: 'get'
     })
 }
-export function GetAllScheduletasks() {
+export function GetAllScheduletasks(protocol, addr, port) {
     return request({
-        url: '/scheduledtasks',
+        url: '/scheduledtasks?pro=' + protocol + "&a=" + addr + "&p=" + port,
         method: 'get'
     })
 }
