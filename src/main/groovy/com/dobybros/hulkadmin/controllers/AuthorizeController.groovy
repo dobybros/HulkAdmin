@@ -6,6 +6,7 @@ import com.alibaba.fastjson.JSONArray
 import com.dobybros.hulkadmin.auth.LoginSevice
 import com.dobybros.hulkadmin.config.ApplicationConfig
 import com.dobybros.hulkadmin.config.NginxConfig
+import com.dobybros.hulkadmin.general.GeneralException
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
@@ -14,9 +15,11 @@ import com.docker.storage.adapters.impl.ServersServiceImpl
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang.StringUtils
+import org.apache.tomcat.util.ExceptionUtils
 import org.bson.Document
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.CrossOrigin
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -59,59 +62,93 @@ public class AuthorizeController {
         ]
     }
 
+    @PostMapping("/groovyzips")
+    def uploadGroovys(@RequestParam("file") MultipartFile file) {
+        if (file != null) {
+            String parentFileStr = System.getProperty("user.dir") + File.separator + "groovysUpload"
+            try {
+                File groovyFile = new File(parentFileStr + File.separator + "example")
+                if (!groovyFile.exists()) {
+                    groovyFile.mkdirs()
+                }
+                file.transferTo(groovyFile)
+                com.dobybros.hulkadmin.utils.FileUtils.unZip(groovyFile, parentFileStr + File.separator + "unzip")
+                File unzipFile = new File(parentFileStr + File.separator + "unzip")
+                if (unzipFile.exists()) {
+                    File[] unzipFiles = unzipFile.listFiles()
+                    if (unzipFiles.length == 1) {
+                        if (unzipFiles[0].getName().equals("scripts")) {
+                            File[] groovyFiles = unzipFiles[0].listFiles()
+                            for (File theGroovyFile : groovyFiles) {
+                                uploadGroovyZip(FileUtils.openInputStream(new File(theGroovyFile.getAbsolutePath() + File.separator + "groovy.zip")), theGroovyFile.getName())
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable throwable) {
+                throwable.printStackTrace()
+                LoggerEx.error(TAG, "Upload groovys failed, err: " + org.apache.commons.lang.exception.ExceptionUtils.getFullStackTrace(throwable))
+            } finally {
+                File parentFile = new File(parentFileStr)
+                FileUtils.deleteQuietly(parentFile)
+            }
+
+        }
+    }
+
     @PostMapping("/groovyzip")
     def uploadGroovy(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "s") String serviceName, @RequestParam(value = "v") String version) {
         if (file != null) {
-            String versionNumber = null
+            String serviceNameVersion = null
             if (version != null) {
+                String versionNumber = null
                 String[] versionStrs = version.split(":")
                 if (versionStrs.length > 1) {
                     versionNumber = versionStrs[1].trim()
                 } else {
                     versionNumber = versionStrs[0].trim()
                 }
-            }
-            if (versionNumber != null) {
-                String thePath = null
-                if (versionNumber != "0") {
-                    thePath = applicationConfig.scriptRemotePath + serviceName + "_v" + versionNumber + "/groovy.zip"
-                } else {
-                    thePath = applicationConfig.scriptRemotePath + serviceName + "/groovy.zip"
+                if (versionNumber != null) {
+                    if (versionNumber != "0") {
+                        serviceNameVersion = serviceName + "_v" + versionNumber
+                    } else {
+                        serviceNameVersion = serviceName
+                    }
                 }
-                FileAdapter.PathEx path = new FileAdapter.PathEx(thePath);
-                fileAdapter.saveFile(file.getInputStream(), path, FileAdapter.FileReplaceStrategy.REPLACE);
             }
+            uploadGroovyZip(file.getInputStream(), serviceNameVersion)
         }
     }
 
-    @PostMapping("/web")
-    def uploadWebFile(@RequestParam("file") MultipartFile file,
+    private def uploadGroovyZip(InputStream inputStream, String serviceNameVersion) {
+        String thePath = applicationConfig.scriptRemotePath + serviceNameVersion + "/groovy.zip"
+        FileAdapter.PathEx path = new FileAdapter.PathEx(thePath);
+        fileAdapter.saveFile(inputStream, path, FileAdapter.FileReplaceStrategy.REPLACE);
+    }
+
+    @PostMapping("/web/{nginxName}")
+    def uploadWebFile(@PathVariable String nginxName, @RequestParam("file") MultipartFile file,
                       @RequestParam(value = "w") String webName, @RequestParam(value = "p") String projectName) {
         if (!StringUtils.isEmpty(webName) && !StringUtils.is(projectName)) {
-            int count = 1
-            String nginxAccount = null
-            String nginxPort = null
-            String nginxPasswd = null
-            String nginxIp = null
-            while (nginxConfig.nginx?.get("ip" + count) != null) {
-                nginxIp = nginxConfig.nginx?.get("ip" + count)
-                nginxPort = nginxConfig.nginx?.get("port" + count)
-                nginxAccount = nginxConfig.nginx?.get("account" + count)
-                nginxPasswd = nginxConfig.nginx?.get("passwd" + count)
-                if (nginxIp != null && nginxPort != null && nginxAccount != null && nginxPasswd != null) {
-                    String wwwPath = applicationConfig.nginxWwwPath
-                    String projectPath = wwwPath + "/" + webName + "/" + projectName
-                    String fileName = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
-                    SftpClient sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                    ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                    sshClient.excuteCommand("sudo mkdir -p " + projectPath)
-                    sftpClient.uploadByStream(projectPath, fileName + ".zip", file.inputStream)
-                    sshClient.excuteCommand("sudo unzip -d " + projectPath + "/" + fileName + " " + projectPath + "/" + fileName + ".zip")
-                    sshClient.excuteCommand("sudo rm -rf " + projectPath + "/" + fileName + ".zip")
-                }
-                count++
+            Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
+            if (theNginxMap != null) {
+                String nginxAccount = theNginxMap.get("account")
+                String nginxPort = theNginxMap.get("port")
+                String nginxPasswd = theNginxMap.get("passwd")
+                String nginxIp = theNginxMap.get("ip")
+                String wwwPath = theNginxMap.get("webPath")
+                String projectPath = wwwPath + "/" + webName + "/" + projectName
+                String fileName = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
+                SftpClient sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+                ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+                sshClient.excuteCommand("sudo mkdir -p " + projectPath)
+                sftpClient.uploadByStream(projectPath, fileName + ".zip", file.inputStream)
+                sshClient.excuteCommand("sudo unzip -d " + projectPath + "/" + fileName + " " + projectPath + "/" + fileName + ".zip")
+                sshClient.excuteCommand("sudo rm -rf " + projectPath + "/" + fileName + ".zip")
+            } else {
+                throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
             }
         }
     }
@@ -171,6 +208,52 @@ public class AuthorizeController {
         }
         FileUtils.deleteQuietly(new File(zipFilePath))
         FileUtils.deleteQuietly(directory)
+    }
+
+    @GetMapping("/web/{nginxName}/{webName}/{projectName}/{version}")
+    def downWeb(@PathVariable String nginxName, @PathVariable String webName, @PathVariable String projectName, @PathVariable String version, HttpServletResponse response) {
+        if (version == "undefined") {
+            throw new GeneralException(5001, "Version cant be null")
+        }
+        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
+        if(theNginxMap != null){
+            String nginxAccount = theNginxMap.get("account")
+            String nginxPort = theNginxMap.get("port")
+            String nginxPasswd = theNginxMap.get("passwd")
+            String nginxIp = theNginxMap.get("ip")
+            String wwwPath = theNginxMap.get("webPath")
+            String projectPath = wwwPath + "/" + webName + "/" + projectName
+            ShellClient shellClient = null
+            SftpClient sftpClient = null
+            InputStream inputStream = null
+            String projectVersionName = webName + "-" + projectName + "-" + version
+            try {
+                shellClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+                shellClient.excuteCommand("sudo cp -r " + projectPath + "/" + version + " ./" + projectVersionName)
+                shellClient.excuteCommand("sudo zip -r " + projectVersionName + ".zip " + projectVersionName + "/*")
+                sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+                response.setContentType("application/zip");
+                response.addHeader("Content-Disposition", "attachment;fileName=" + projectVersionName + ".zip");
+                inputStream = sftpClient.download(projectVersionName + ".zip")
+                IOUtils.copy(inputStream, response.getOutputStream())
+            } catch (Throwable throwable) {
+                LoggerEx.error(TAG, "Download web error,err: " + org.apache.commons.lang.exception.ExceptionUtils.getFullStackTrace(throwable))
+                throwable.printStackTrace()
+            } finally {
+                if (shellClient != null) {
+                    shellClient.excuteCommand("sudo rm -rf " + projectVersionName + ".zip")
+                    shellClient.excuteCommand("sudo rm -rf " + projectVersionName)
+                }
+                if (inputStream != null) {
+                    inputStream.close()
+                }
+                if (sftpClient != null) {
+                    sftpClient.close()
+                }
+            }
+        }else {
+            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
+        }
     }
 
     @GetMapping("downconfigs")

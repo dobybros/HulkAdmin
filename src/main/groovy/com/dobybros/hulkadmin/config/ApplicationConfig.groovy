@@ -29,12 +29,8 @@ class ApplicationConfig {
     public String gridfsBucket
     @Value('${script.remote.path}')
     public String scriptRemotePath
-    @Value('${nginx.Www.Path}')
-    public String nginxWwwPath
     @Value('${nginx.path}')
     public String nginxPath
-    @Value('${nginx.remotePath}')
-    public String nginxRemotePath
     @Value('${token.expire.time}')
     public String tokenExpireTime
     @Value('${dockerstatus.dbname}')
@@ -49,4 +45,5 @@ class ApplicationConfig {
     public String mongoPassword
     @Value('${database.host}')
     public String databaseHost
+
 }

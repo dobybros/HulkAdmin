@@ -1,38 +1,95 @@
 package com.dobybros.hulkadmin.controllers
 
 import chat.json.Result
+import com.alibaba.fastjson.JSON
 import com.dobybros.hulkadmin.remoteService.discovery.DiscoveryService
+import com.docker.data.DockerStatus
+import com.docker.data.Service
 import com.docker.rpc.remote.stub.ServiceStubManager
+import com.docker.storage.adapters.impl.DockerStatusServiceImpl
 import com.docker.utils.ScriptHttpUtils
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.CrossOrigin
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Created by lick on 2019/8/3.
  * Description：
  */
-@RequestMapping
+@RequestMapping("gc")
 @CrossOrigin
 @RestController
 class GroovyCloudController {
     @Autowired
-    ServiceStubManager serviceStubManager
-
-    @GetMapping("scheduledtasks")
-    def getScheduledTasks(@RequestParam(name = "pro") String protocol,
-                            @RequestParam(name = "a") String addr,
-                            @RequestParam(name = "p") String port){
-        String url = protocol + "://" + addr + ":" + port
-       Result result = ScriptHttpUtils.get(url + "/rest/discovery/timerInfo", Result.class)
-        if(result != null){
-            return result.getData()
+    DockerStatusServiceImpl dockerStatusService
+    Map serverTypeAddressMap;
+    @GetMapping("/init")
+    def getGCInit(){
+        List<DockerStatus> dockerStatuses = dockerStatusService.getAllDockerStatus()
+        List dockerList = new ArrayList()
+        if(dockerStatuses != null){
+            serverTypeAddressMap = new ConcurrentHashMap()
+            for (DockerStatus dockerStatus : dockerStatuses){
+                if(dockerStatus.getIp() != null && dockerStatus.getHttpPort() != null && dockerStatus.getDockerName() != null){
+                    serverTypeAddressMap.putIfAbsent(dockerStatus.getDockerName() + "_" + dockerStatus.getIp(), "http://" + dockerStatus.getIp() + ":" + dockerStatus.getHttpPort())
+                    Map dockerMap = new HashMap()
+                    dockerMap.put("value", dockerStatus.getDockerName() + "_" + dockerStatus.getIp())
+                    dockerMap.put("label", dockerStatus.getDockerName() + "_" + dockerStatus.getIp())
+                    List secondList = new ArrayList()
+                    dockerMap.put("children", secondList)
+                    Map timerMap = new HashMap()
+                    timerMap.put("value", "timer")
+                    timerMap.put("label", "timer")
+                    secondList.add(timerMap)
+                    List timerThirdList = new ArrayList()
+                    Map timerThirdMap = new HashMap()
+                    timerThirdMap.put("value", "timer")
+                    timerThirdMap.put("label", "timer")
+                    timerThirdList.add(timerThirdMap)
+                    timerMap.put("children", timerThirdList)
+                    Map serviceMap = new HashMap()
+                    serviceMap.put("value", "memory")
+                    serviceMap.put("label", "memory")
+                    secondList.add(serviceMap)
+                    List<Service> serviceList = dockerStatus.getServices()
+                    if(serviceList != null && !serviceList.isEmpty()){
+                        List serviceThirdList = new ArrayList()
+                        for (Service service : serviceList){
+                            Map serviceThirdMap = new HashMap()
+                            serviceThirdMap.put("value", service.getService() + "_v" + service.getVersion().toString())
+                            serviceThirdMap.put("label", service.getService())
+                            serviceThirdList.add(serviceThirdMap)
+                        }
+                        serviceMap.put("children", serviceThirdList)
+                    }
+                    dockerList.add(dockerMap)
+                }
+            }
+            return dockerList
         }
         return null
+    }
+    @PostMapping("/data")
+    def getGCData(@RequestBody String[] params){
+        if(params.length == 3){
+            String serverType = params[0]
+            String address = serverTypeAddressMap.get(serverType)
+            if(address != null){
+                String url = address + "/base/" + params[1] + "/" + params[2]
+                Result result = ScriptHttpUtils.post(null, url, null, Result.class)
+                if(result != null){
+                    return JSON.toJSONString(result.getData(), true)
+                }
+            }
+        }
     }
 }
 

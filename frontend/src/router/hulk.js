@@ -55,10 +55,10 @@ export default {
             meta: {...meta, title: `Deploy Reload Nginx`}
         },
         {
-            path: `Scheduledtasks`,
-            name: `${pre}/scheduledtasks`,
-            component: _import('hulk/scheduledtasks/index'),
-            meta: {...meta, title: `Scheduledtasks`}
+            path: `gcMemory`,
+            name: `${pre}/gcMemory`,
+            component: _import('hulk/gcMemory/index'),
+            meta: {...meta, title: `GCMemory`}
         }
     ])('hulk-admin-')
 }

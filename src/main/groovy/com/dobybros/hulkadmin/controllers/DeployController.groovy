@@ -49,7 +49,6 @@ class DeployController {
     @Autowired
     ServiceVersionServiceImpl serviceVersionService
 
-
     @PostMapping("/serverconfig")
     def addConfig(@RequestBody Document config) {
         Document configFinal = new Document()
@@ -196,6 +195,7 @@ class DeployController {
             fileAdapter.deleteFileRegix(new BasicDBObject("filename", new Document().append("\$regex", applicationConfig.scriptRemotePath + serviceName)))
         }
     }
+
     @GetMapping("/serviceversions")
     def getAllServiceVersions() {
         List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
@@ -290,82 +290,93 @@ class DeployController {
         }
     }
 
-    @GetMapping("/webs")
-    def getWebs() {
-        int count = 1
-        List<Map> nginxList = new ArrayList()
-        Map nginxMap;
-        while (nginxConfig.nginx?.get("ip" + count) != null) {
-            nginxMap = new HashMap()
-            nginxMap.put("ip", nginxConfig.nginx?.get("ip" + count))
-            nginxList.add(nginxMap)
-            count++
+    @GetMapping("allnginx")
+    def getAllNginx() {
+        nginxConfig.setNginxMap()
+        List nginxList = new ArrayList()
+        Map map = null
+        for (String nginxName : nginxConfig.getNginxMap().keySet()) {
+            map = new HashMap()
+            map.put("value", nginxName)
+            nginxList.add(map)
         }
-        if (nginxList.size() > 0) {
-            ShellClient sshClient = new ShellClient(nginxConfig.nginx.get("ip1"), nginxConfig.nginx.get("account1"), nginxConfig.nginx.get("passwd1"), Integer.valueOf(nginxConfig.nginx.get("port1")))
-            List webFilenames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath)
-            List webFileList = new ArrayList()
-            Map webFileMap
-            if (webFilenames != null && !webFilenames.isEmpty()) {
-                List webFilenameList = new ArrayList()
-                Map webFileNameMap
-                for (String webFileName : webFilenames) {
-                    webFileNameMap = new HashMap()
-                    List projectFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webFileName)
-                    if (projectFileNames != null && !projectFileNames.isEmpty()) {
-                        Map projectFileNameMap
-                        List projectFileNameList = new ArrayList()
-                        for (String projectFileName : projectFileNames) {
-                            projectFileNameMap = new HashMap()
-                            List projectFileNameVersions = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webFileName + "/" + projectFileName)
-                            Map projectFileNameVersionsMap = new HashMap()
-                            if (projectFileNameVersions != null && !projectFileNameVersions.isEmpty()) {
-                                List projectFileNameVersionList = sortWebVersion(projectFileNameVersions)
-                                projectFileNameMap.put("projectName", projectFileName)
-                                projectFileNameMap.put("versions", projectFileNameVersionList)
+        return nginxList
+    }
+
+
+    @GetMapping("/webs/{nginxName}")
+    def getWebs(@PathVariable String nginxName) {
+        if (StringUtils.isNotBlank(nginxName)) {
+            Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
+            if (theNginxMap != null) {
+                ShellClient sshClient = new ShellClient(theNginxMap.get("ip"), theNginxMap.get("account"), theNginxMap.get("passwd"), Integer.valueOf(theNginxMap.get("port")))
+                List webFilenames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath"))
+                List webFileList = new ArrayList()
+                Map webFileMap
+                if (webFilenames != null && !webFilenames.isEmpty()) {
+                    List webFilenameList = new ArrayList()
+                    Map webFileNameMap
+                    for (String webFileName : webFilenames) {
+                        webFileNameMap = new HashMap()
+                        List projectFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + webFileName)
+                        if (projectFileNames != null && !projectFileNames.isEmpty()) {
+                            Map projectFileNameMap
+                            List projectFileNameList = new ArrayList()
+                            for (String projectFileName : projectFileNames) {
+                                projectFileNameMap = new HashMap()
+                                List projectFileNameVersions = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath")  + "/" + webFileName + "/" + projectFileName)
+                                Map projectFileNameVersionsMap = new HashMap()
+                                if (projectFileNameVersions != null && !projectFileNameVersions.isEmpty()) {
+                                    List projectFileNameVersionList = sortWebVersion(projectFileNameVersions)
+                                    projectFileNameMap.put("projectName", projectFileName)
+                                    projectFileNameMap.put("versions", projectFileNameVersionList)
+                                }
+                                projectFileNameList.add(projectFileNameMap)
                             }
-                            projectFileNameList.add(projectFileNameMap)
+                            if (projectFileNameMap != null && !projectFileNameMap.isEmpty()) {
+                                webFileNameMap.put("webName", webFileName)
+                                webFileNameMap.put("projectNames", projectFileNameList)
+                            }
                         }
-                        if (projectFileNameMap != null && !projectFileNameMap.isEmpty()) {
-                            webFileNameMap.put("webName", webFileName)
-                            webFileNameMap.put("projectNames", projectFileNameList)
+                        if (!webFileNameMap.isEmpty()) {
+                            webFilenameList.add(webFileNameMap)
                         }
                     }
-                    webFilenameList.add(webFileNameMap)
+                    if (!webFilenameList.isEmpty()) {
+                        return webFilenameList
+                    }
                 }
-                if (!webFilenameList.isEmpty()) {
-                    return webFilenameList
-                }
+            } else {
+                throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
             }
         }
     }
 
-    @DeleteMapping("/web/{webName}/{projectName}/{version}")
-    def deleteWeb(@PathVariable String webName, @PathVariable String projectName, @PathVariable String version) {
-        int count = 1
-        String nginxAccount = null
-        String nginxPort = null
-        String nginxPasswd = null
-        String nginxIp = null
-        while (nginxConfig.nginx?.get("ip" + count) != null) {
-            nginxIp = nginxConfig.nginx?.get("ip" + count)
-            nginxPort = nginxConfig.nginx?.get("port" + count)
-            nginxAccount = nginxConfig.nginx?.get("account" + count)
-            nginxPasswd = nginxConfig.nginx?.get("passwd" + count)
-            if (nginxIp != null && nginxPort != null && nginxAccount != null && nginxPasswd != null) {
-                String wwwPath = applicationConfig.nginxWwwPath
-                String projectPath = wwwPath + "/" + webName + "/" + projectName
-                ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                sshClient.excuteCommand("sudo rm -rf " + projectPath + "/" + version)
-            }
-            count++
+    @DeleteMapping("/web/{nginxName}/{webName}/{projectName}/{version}")
+    def deleteWeb(@PathVariable String nginxName, @PathVariable String webName, @PathVariable String projectName, @PathVariable String version) {
+        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
+        if (theNginxMap != null) {
+            String nginxAccount = theNginxMap.get("account")
+            String nginxPort = theNginxMap.get("port")
+            String nginxPasswd = theNginxMap.get("passwd")
+            String nginxIp = theNginxMap.get("ip")
+            String wwwPath = theNginxMap.get("webPath")
+            String projectPath = wwwPath + "/" + webName + "/" + projectName
+            ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+            sshClient.excuteCommand("sudo rm -rf " + projectPath + "/" + version)
+        } else {
+            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
         }
     }
-    @GetMapping("/serverweb")
-    def getServerWeb() {
+
+    @GetMapping("/serverweb/{nginxName}")
+    def getServerWeb(@PathVariable String nginxName) {
         Map serverWebMap = new HashMap()
-//        ServiceVersionService serviceVersionService = serviceStubManager.getService(ServiceVersionService.SERVICE, ServiceVersionService.class)
-        Map serverServices = redisTemplate.opsForHash().get("SERVICEWEBS", "SERVICEWEBS".hashCode())
+        Map nginxServerServices = redisTemplate.opsForHash().get("SERVICEWEBS", "SERVICEWEBS".hashCode())
+        Map serverServices = null
+        if(nginxServerServices != null){
+            serverServices = nginxServerServices.get(nginxName)
+        }
         if (serverServices != null && serverServices.size() > 0) {
             List servers = new ArrayList()
             List versions = null
@@ -409,27 +420,21 @@ class DeployController {
                 serverWebMap.put("servers", servers)
             }
         }
-        int count = 1
-        List<Map> nginxList = new ArrayList()
-        Map nginxMap;
-        while (nginxConfig.nginx?.get("ip" + count) != null) {
-            nginxMap = new HashMap()
-            nginxMap.put("ip", nginxConfig.nginx?.get("ip" + count))
-            nginxList.add(nginxMap)
-            count++
-        }
-        if (nginxList.size() > 0) {
-            serverWebMap.put("nginx", nginxList)
-            ShellClient sshClient = new ShellClient(nginxConfig.nginx.get("ip1"), nginxConfig.nginx.get("account1"), nginxConfig.nginx.get("passwd1"), Integer.valueOf(nginxConfig.nginx.get("port1")))
-            List firstFilenames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath)
-//        List firstFilenames = sshClient.excuteCommand("sudo ls /root/aa")
+        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
+        if (theNginxMap != null) {
+            String nginxAccount = theNginxMap.get("account")
+            String nginxPort = theNginxMap.get("port")
+            String nginxPasswd = theNginxMap.get("passwd")
+            String nginxIp = theNginxMap.get("ip")
+            ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+            List firstFilenames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath"))
             List webFileList = new ArrayList()
             List webFiles = null
             Map webFileMap = null
             if (firstFilenames != null && firstFilenames.size() > 0) {
                 //tc這一層
                 for (String firstFileName : firstFilenames) {
-                    List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + firstFileName)
+                    List secondFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + firstFileName)
                     if (secondFileNames != null && secondFileNames.size() > 0) {
                         Map projectMap
                         for (String secondFileName : secondFileNames) {
@@ -441,7 +446,7 @@ class DeployController {
                                     projectMap.put("currentVersion", serverServices.get(firstFileName + "#" + secondFileName))
                                 }
                             }
-                            List thirdFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + firstFileName + "/" + secondFileName)
+                            List thirdFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + firstFileName + "/" + secondFileName)
                             if (thirdFileNames != null && !thirdFileNames.isEmpty()) {
                                 projectMap.put("versions", sortWebVersion(thirdFileNames))
                             }
@@ -453,8 +458,10 @@ class DeployController {
                     serverWebMap.put("webs", webFileList)
                 }
             }
+            return serverWebMap
+        } else {
+            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
         }
-        return serverWebMap
     }
 
     @GetMapping("/serverweb/server/{serviceName}")
@@ -488,38 +495,38 @@ class DeployController {
         }
     }
 
-    @GetMapping("/serverweb/web/{webName}/{projectName}")
-    def getWebVersionsByWebName(@PathVariable String webName, @PathVariable String projectName) {
-        ShellClient sshClient = new ShellClient(nginxConfig.nginx.get("ip1"), nginxConfig.nginx.get("account1"), nginxConfig.nginx.get("passwd1"), Integer.valueOf(nginxConfig.nginx.get("port1")))
-        List secondFileNames = sshClient.excuteCommand("sudo ls " + applicationConfig.nginxWwwPath + "/" + webName + "/" + projectName)
-//        List secondFileNames = sshClient.excuteCommand("sudo ls /root/aa" + "/" + webName)
-        if (secondFileNames != null && secondFileNames.size() > 0) {
-            secondFileNames = sortWebVersion(secondFileNames)
-            return secondFileNames
+    @GetMapping("/serverweb/web/{nginxName}/{webName}/{projectName}")
+    def getWebVersionsByWebName(@PathVariable String nginxName ,@PathVariable String webName, @PathVariable String projectName) {
+        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
+        if(theNginxMap != null){
+            String nginxAccount = theNginxMap.get("account")
+            String nginxPort = theNginxMap.get("port")
+            String nginxPasswd = theNginxMap.get("passwd")
+            String nginxIp = theNginxMap.get("ip")
+            ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
+            List secondFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + webName + "/" + projectName)
+            if (secondFileNames != null && secondFileNames.size() > 0) {
+                secondFileNames = sortWebVersion(secondFileNames)
+                return secondFileNames
+            }
+        }else {
+            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
         }
     }
 
     @PostMapping("/serverweb")
     def reloadNginx(@RequestBody Map map) {
-        String nginxIp = map.get("ip")
-        if (!StringUtils.isEmpty(nginxIp)) {
-            int count = 1
-            String nginxAccount = null
-            String nginxPort = null
-            String nginxPasswd = null
-            while (nginxConfig.nginx?.get("ip" + count) != null) {
-                if (nginxIp.equals(nginxConfig.nginx?.get("ip" + count))) {
-                    nginxPort = nginxConfig.nginx?.get("port" + count)
-                    nginxAccount = nginxConfig.nginx?.get("account" + count)
-                    nginxPasswd = nginxConfig.nginx?.get("passwd" + count)
-                    break
-                } else {
-                    count++
-                }
-            }
-            if (nginxPort != null && nginxAccount != null && nginxPasswd != null) {
+        String nginxName = map.get("nginxName")
+        if (!StringUtils.isEmpty(nginxName)) {
+            nginxConfig.setNginxMap()
+            Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
+            if(theNginxMap != null){
+                String nginxAccount = theNginxMap.get("account")
+                String nginxPort = theNginxMap.get("port")
+                String nginxPasswd = theNginxMap.get("passwd")
+                String nginxIp = theNginxMap.get("ip")
                 SftpClient sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                sftpClient.download(applicationConfig.nginxRemotePath, "nginx.conf", applicationConfig.nginxPath + "nginx.conf")
+                sftpClient.download(theNginxMap.get("nginxRemotePath"), "nginx.conf", applicationConfig.nginxPath + "nginx.conf")
                 LoggerEx.info("DeployController", "Download nginx.conf success,path: " + applicationConfig.nginxPath + "nginx.conf")
                 if (map != null && map.size() > 0) {
                     Map serverServices = new HashMap()
@@ -536,8 +543,8 @@ class DeployController {
                                 currentVersion = webMap.get("currentVersion").toString()
                             }
                             if (!StringUtils.isEmpty(webName) && !StringUtils.isEmpty(currentVersion) && !StringUtils.isEmpty(projectName)) {
-                                String originalPre = applicationConfig.nginxWwwPath + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/"
-                                String replacePath = applicationConfig.nginxWwwPath + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/" + currentVersion.replaceAll(" ", "") + ";"
+                                String originalPre = theNginxMap.get("webPath") + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/"
+                                String replacePath = theNginxMap.get("webPath") + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/" + currentVersion.replaceAll(" ", "") + ";"
                                 Pattern pattern = Pattern.compile(originalPre + ".*?;")
                                 Matcher matcher = pattern.matcher(nginxContent)
                                 nginxContent = matcher.replaceAll(replacePath)
@@ -561,13 +568,13 @@ class DeployController {
                                 if (index != -1) {
                                     String oldVersion = ''
                                     for (int i = 0; i < 4; i++) {
-                                        if(StringUtils.isNumeric(nginxContent.charAt(index + originalPre.size() + i).toString())){
+                                        if (StringUtils.isNumeric(nginxContent.charAt(index + originalPre.size() + i).toString())) {
                                             oldVersion += nginxContent.charAt(index + originalPre.size() + i).toString()
-                                        }else {
+                                        } else {
                                             break
                                         }
                                     }
-                                    if(oldVersion != null){
+                                    if (oldVersion != null) {
                                         nginxContent = nginxContent.replaceAll(originalPre + oldVersion, replacePath)
                                         serverServices.put(serviceName, currentVersion)
                                     }
@@ -580,11 +587,11 @@ class DeployController {
                     def targetDir = originPath + "_" + targetTime
                     FileUtils.writeStringToFile(new File(targetDir), nginxContent, "utf8")
                     try {
-                        sftpClient.upload(targetDir, applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime)
-                    }catch(Throwable t){
+                        sftpClient.upload(targetDir, theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime)
+                    } catch (Throwable t) {
                         LoggerEx.error(TAG, "Upload file failed!!! err: " + t.getMessage())
                     }
-                    LoggerEx.info("DeployController", "upload nginx target.conf success,path: " + applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime)
+                    LoggerEx.info("DeployController", "upload nginx target.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime)
                     // check nginx config
                     ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
                     try {
@@ -598,28 +605,32 @@ class DeployController {
 ////             rename original nginx fileName,   reload file
                     String nginxBak = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
                     try {
-                        sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + " " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak)
-                        LoggerEx.info("DeployController", "mv old nginx.conf success,path: " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak)
+                        sshClient.excuteCommand("sudo mv " + theNginxMap.get("nginxRemotePath") + nginxFileName + " " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + nginxBak)
+                        LoggerEx.info("DeployController", "mv old nginx.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + nginxBak)
                         Thread.sleep(1000)
-                        sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime + " " + applicationConfig.nginxRemotePath + nginxFileName)
-                        LoggerEx.info("DeployController", "mv new nginx.conf success,path: " + applicationConfig.nginxRemotePath + nginxFileName + "_" + targetTime + "to" + applicationConfig.nginxRemotePath + nginxFileName)
+                        sshClient.excuteCommand("sudo mv " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime + " " + theNginxMap.get("nginxRemotePath") + nginxFileName)
+                        LoggerEx.info("DeployController", "mv new nginx.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime + "to" + theNginxMap.get("nginxRemotePath") + nginxFileName)
                         sshClient.excuteCommand("sudo docker exec nginx nginx -s reload")
                     } catch (Throwable t) {
                         FileUtils.deleteQuietly(new File(originPath))
                         FileUtils.deleteQuietly(new File(targetDir))
-                        sshClient.excuteCommand("sudo rm -rf " + applicationConfig.nginxRemotePath + nginxFileName)
-                        sshClient.excuteCommand("sudo mv " + applicationConfig.nginxRemotePath + nginxFileName + "_" + nginxBak + " " + applicationConfig.nginxRemotePath + nginxFileName)
+                        sshClient.excuteCommand("sudo rm -rf " + theNginxMap.get("nginxRemotePath") + nginxFileName)
+                        sshClient.excuteCommand("sudo mv " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + nginxBak + " " + theNginxMap.get("nginxRemotePath") + nginxFileName)
                         sftpClient.close()
                         LoggerEx.error(TAG, "Manage nginx.conf failed!!! error: " + t.getMessage())
                         throw t
                     }
                     if (serverServices.size() > 0) {
-                        redisTemplate.opsForHash().put("SERVICEWEBS", "SERVICEWEBS".hashCode(), serverServices)
+                        Map nginxServerServices = new HashMap()
+                        nginxServerServices.put(nginxName, serverServices)
+                        redisTemplate.opsForHash().put("SERVICEWEBS", "SERVICEWEBS".hashCode(), nginxServerServices)
                     }
                     sftpClient.close()
                     FileUtils.deleteQuietly(new File(originPath))
                     FileUtils.deleteQuietly(new File(targetDir))
                 }
+            }else {
+                throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
             }
         }
     }
@@ -660,13 +671,13 @@ class DeployController {
                     }
                     try {
                         dockerStatusService.deleteDockerStatus(dockerStatus.server)
-                    }catch(Throwable t){
+                    } catch (Throwable t) {
                         LoggerEx.error(TAG, t.getMessage())
                     }
                     ShellClient sshClient = new ShellClient(ip, account, passwd, Integer.valueOf(port))
                     try {
                         sshClient.excuteCommand("sudo docker restart " + dockerStatus.dockerName)
-                    }catch(Throwable t){
+                    } catch (Throwable t) {
                         LoggerEx.error(DeployController.class.getSimpleName(), "Reload container failed!!! err: " + t.message)
                     }
                 }

@@ -65,7 +65,13 @@ class SftpClient {
             e.printStackTrace()
         }
     }
-
+    public InputStream download(String srcPath) {
+        try {
+            sftp.get(srcPath);
+        } catch (Exception e) {
+            e.printStackTrace()
+        }
+    }
     public void upload(String srcFile, String dest) {
         try {
             sftp.put(srcFile, dest);

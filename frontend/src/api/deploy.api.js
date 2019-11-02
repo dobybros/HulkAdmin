@@ -58,9 +58,9 @@ export function RemoveServiceVersion(id) {
         method: 'delete'
     })
 }
-export function GetAllServerWebs() {
+export function GetAllServerWebs(data) {
     return request({
-        url: '/deploy/serverweb',
+        url: '/deploy/serverweb/' + data,
         method: 'get'
     })
 }
@@ -77,9 +77,9 @@ export function GetServerVersions(data) {
         method: 'get'
     })
 }
-export function GetWebVersions(webName, projectName) {
+export function GetWebVersions(nginxName, webName, projectName) {
     return request({
-        url: '/deploy/serverweb/web/' + webName + '/' + projectName,
+        url: '/deploy/serverweb/web/' + nginxName + '/' + webName + '/' + projectName,
         method: 'get'
     })
 }
@@ -103,15 +103,16 @@ export function DeleteContainer(server) {
     })
 }
 
-export function GetAllWebs() {
+export function GetAllNginx() {
     return request({
-        url: '/deploy/webs',
+        url: '/deploy/allnginx',
         method: 'get'
     })
 }
-export function GetAllScheduletasks(protocol, addr, port) {
+
+export function GetWebsByNginx(data) {
     return request({
-        url: '/scheduledtasks?pro=' + protocol + "&a=" + addr + "&p=" + port,
+        url: '/deploy/webs/' + data,
         method: 'get'
     })
 }
@@ -124,10 +125,24 @@ export function DownloadAllGroovy(directoryStr) {
     })
 }
 
-export function DeleteWebProjectVersion(webName, projectName, version) {
+export function DeleteWebProjectVersion(nginxName, webName, projectName, version) {
     return request({
-        url: '/deploy/web/' + webName + '/' + projectName + '/' + version,
+        url: '/deploy/web/' + nginxName + '/' + webName + '/' + projectName + '/' + version,
         method: 'delete'
+    })
+}
+export function GetGroovyCloud() {
+    return request({
+        url: '/gc/init',
+        method: 'get'
+    })
+}
+
+export function GetGroovyCloudData(data) {
+    return request({
+        url: '/gc/data',
+        method: 'post',
+        data: data
     })
 }
 

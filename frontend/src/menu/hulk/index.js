@@ -39,8 +39,8 @@ export default {
             icon: 'commenting'
         },
         {
-            path: `${pre}GroovyCLoudScheduledtasks`,
-            title: 'GroovyCLoudScheduledtasks ',
+            path: `${pre}gcMemory`,
+            title: 'GCMemory ',
             icon: 'commenting'
         }
     ])("/hulk/")

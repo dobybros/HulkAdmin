@@ -6,7 +6,7 @@
                     :data="tableData"
                     border
                     style="width: 80%"
-                    max-height="700">
+                    height="700px">
                 <el-table-column
                         prop="serverType"
                         label="ServerType"

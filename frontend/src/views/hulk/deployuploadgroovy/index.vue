@@ -2,11 +2,28 @@
     <el-container>
         <el-main>
             <el-row>
-                <el-col :span="19">
-                    <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.addNewService")}}</el-button>
+                <el-col :span="9">
+                    <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.addNewService")}}
+                    </el-button>
+                </el-col>
+                <el-col :span="9">
+                    <el-upload
+                            accept=".zip"
+                            ref="upload"
+                            :action="uploadGroovys(1)"
+                            :on-success="uploadSuccess"
+                            :file-list="geoovysList"
+                            :limit="1"
+                            :auto-upload="true">
+                        <el-button type="primary">{{$t("views.deploy.uploadGroovys")}}<i
+                                class="el-icon-upload el-icon--right"></i></el-button>
+                    </el-upload>
                 </el-col>
                 <el-col :span="4">
-                    <a style="color: #0000cc;border-color: #000fff" target="_blank" :href="downloadGroovyUrl + '/open/downzips'" ><el-button type="success">{{$t("views.deploy.downloadAllGroovy")}}</el-button></a>
+                    <a style="color: #0000cc;border-color: #000fff" target="_blank"
+                       :href="downloadGroovyUrl + '/open/downzips'">
+                        <el-button type="success">{{$t("views.deploy.downloadAllGroovy")}}</el-button>
+                    </a>
                 </el-col>
             </el-row>
 
@@ -15,7 +32,7 @@
                         :data="tableData"
                         style="width: 90%;"
                         row-key="serviceName"
-                        height="550"
+                        height="550px"
                         border
                         :tree-props="{children: 'allVersion'}">
                     <el-table-column
@@ -143,11 +160,12 @@
             </el-row>
 
             <span slot="footer">
-                <span >
+                <span>
                     <el-button size="medium" @click="cancelDownoad" style="margin-right: 10px">{{$t("views.deploy.cancel")}}</el-button>
-                    <a style="color: #0000cc;border-color: #000fff" target="_blank" @click="downDialogVisible=false" :href="downloadGroovyUrl + '/open/downzip?s='+ downloadServiceName + '&v=' + downValue" ><el-button type="success">{{$t("views.deploy.download")}}</el-button></a>
+                    <a style="color: #0000cc;border-color: #000fff" target="_blank" @click="downDialogVisible=false"
+                       :href="downloadGroovyUrl + '/open/downzip?s='+ downloadServiceName + '&v=' + downValue"><el-button
+                            type="success">{{$t("views.deploy.download")}}</el-button></a>
                 </span>
-
   </span>
         </el-dialog>
     </el-container>
@@ -168,6 +186,7 @@
                 downDialogVisible: false,
                 everyData: {},
                 fileList: [],
+                geoovysList: [],
                 param: {},
                 deleteServiceName: '',
                 downloadData: {},
@@ -195,6 +214,14 @@
                 })
         },
         methods: {
+            uploadSuccess(res, file, fileList) {
+                if (res.code === 1) {
+                    this.$message.success("File " + file.name + " Upload Success!")
+                } else {
+                    this.$message.success("File " + file.name + "Upload Failed!")
+                }
+                this.geoovysList = []
+            },
             openUploadDialog(data) {
                 this.dialogVisible = true
                 this.value = ''
@@ -205,6 +232,9 @@
                     this.everyData = {}
                     this.serviceName = ""
                 }
+            },
+            uploadGroovys(num) {
+                return this.downloadGroovyUrl + "/open/groovyzips"
             },
             submitUpload() {
                 if (this.value !== null && this.serviceName !== null && this.value !== '' && this.serviceName !== '') {
@@ -279,6 +309,7 @@
                         this.value = ''
                         this.uploadUrlData = ''
                         this.serviceName = ''
+                        this.fileList = []
                     } else {
                         this.$message.error('Please select a file to upload!');
                     }
@@ -390,20 +421,20 @@
                 this.removeService(this.deleteServiceName)
                 this.deleteServiceName = ""
             },
-            cancelDownoad(){
+            cancelDownoad() {
                 this.downDialogVisible = false
                 this.downloadData = {}
                 this.downValue = ''
                 this.downloadServiceName = ''
             },
-            openDownloadDialog(data){
+            openDownloadDialog(data) {
                 this.downDialogVisible = true
                 this.downloadData = data
                 this.downloadServiceName = data.serviceName
                 this.downValue = ''
             },
-            downloadAllGroovy(){
-                if(this.downloadDirectory !== ''){
+            downloadAllGroovy() {
+                if (this.downloadDirectory !== '') {
                     DownloadAllGroovy(this.downloadDirectory)
                         .then(resp => {
                             this.$message.success("Success!")

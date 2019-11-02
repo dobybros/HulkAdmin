@@ -6,7 +6,7 @@
                         :data="tableData"
                         style="width: 100%;"
                         row-key="serviceName"
-                        height="700"
+                        height="700px"
                         border>
                     <el-table-column
                             prop="serverType"

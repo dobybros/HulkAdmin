@@ -40,7 +40,7 @@
                     :data="tableData"
                     border
                     style="width: 70%"
-                    max-height="600">
+                    height="600px">
                 <el-table-column
                         prop="_id.value"
                         label="ServiceName"
