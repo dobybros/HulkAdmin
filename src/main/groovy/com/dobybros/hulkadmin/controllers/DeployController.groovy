@@ -292,7 +292,6 @@ class DeployController {
 
     @GetMapping("allnginx")
     def getAllNginx() {
-        nginxConfig.setNginxMap()
         List nginxList = new ArrayList()
         Map map = null
         for (String nginxName : nginxConfig.getNginxMap().keySet()) {
@@ -518,7 +517,6 @@ class DeployController {
     def reloadNginx(@RequestBody Map map) {
         String nginxName = map.get("nginxName")
         if (!StringUtils.isEmpty(nginxName)) {
-            nginxConfig.setNginxMap()
             Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
             if(theNginxMap != null){
                 String nginxAccount = theNginxMap.get("account")
@@ -609,8 +607,9 @@ class DeployController {
                         LoggerEx.info("DeployController", "mv old nginx.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + nginxBak)
                         Thread.sleep(1000)
                         sshClient.excuteCommand("sudo mv " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime + " " + theNginxMap.get("nginxRemotePath") + nginxFileName)
-                        LoggerEx.info("DeployController", "mv new nginx.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime + "to" + theNginxMap.get("nginxRemotePath") + nginxFileName)
+                        LoggerEx.info("DeployController", "mv new nginx.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime + " to " + theNginxMap.get("nginxRemotePath") + nginxFileName)
                         sshClient.excuteCommand("sudo docker exec nginx nginx -s reload")
+                        LoggerEx.info(TAG, "sudo docker exec nginx nginx -s reload")
                     } catch (Throwable t) {
                         FileUtils.deleteQuietly(new File(originPath))
                         FileUtils.deleteQuietly(new File(targetDir))

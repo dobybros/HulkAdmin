@@ -33,7 +33,6 @@ class CommonBean {
     @Bean
     ServiceStubManager serviceStubManager() {
         ServiceStubManager serviceStubManager = new ServiceStubManager();
-        serviceStubManager.setHost(applicationConfig.remoteServiceHost)
         serviceStubManager.init()
         return serviceStubManager
     }
