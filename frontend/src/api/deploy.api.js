@@ -145,4 +145,11 @@ export function GetGroovyCloudData(data) {
         data: data
     })
 }
+export function DeleteGwsUser(data, userId) {
+    return request({
+        url: '/gc/gws/delete/' + userId,
+        method: 'post',
+        data: data
+    })
+}
 
