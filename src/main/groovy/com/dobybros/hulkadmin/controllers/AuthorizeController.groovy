@@ -10,8 +10,12 @@ import com.dobybros.hulkadmin.general.GeneralException
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
+import com.docker.data.DockerStatus
+import com.docker.data.ServiceVersion
 import com.docker.file.adapters.GridFSFileHandler
+import com.docker.storage.adapters.impl.DockerStatusServiceImpl
 import com.docker.storage.adapters.impl.ServersServiceImpl
+import com.docker.storage.adapters.impl.ServiceVersionServiceImpl
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang.StringUtils
@@ -34,6 +38,7 @@ import javax.servlet.http.Cookie
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 import javax.servlet.http.HttpSession
+import java.util.concurrent.ConcurrentHashMap
 
 @RestController
 @RequestMapping("open")
@@ -50,6 +55,20 @@ public class AuthorizeController {
     NginxConfig nginxConfig
     @Autowired
     ServersServiceImpl serversService
+    @Autowired
+    ServiceVersionServiceImpl serviceVersionService
+    @Autowired
+    DockerStatusServiceImpl dockerStatusService
+    private final String GROOVYCLOUYDSERVERS1 = "groovycloud.server."
+
+    private Map<String, List<MultipartFile>> jarFiles = new ConcurrentHashMap<>()
+    Properties groovyCloudProp
+
+    AuthorizeController() {
+        InputStream inStream = DeployController.class.getClassLoader().getResourceAsStream("groovycloud.properties");
+        groovyCloudProp = new Properties();
+        groovyCloudProp.load(inStream);
+    }
 
     @PostMapping("/login")
     def login(@RequestBody Map<String, String> body, HttpServletResponse response, HttpServletRequest request) {
@@ -117,8 +136,12 @@ public class AuthorizeController {
                         serviceNameVersion = serviceName
                     }
                 }
+                Document document = serversService.getServerConfig(serviceNameVersion)
+                if (document == null) {
+                    throw new GeneralException(5000, "Cant find config of " + serviceNameVersion + ", need configure first")
+                }
+                uploadGroovyZip(file.getInputStream(), serviceNameVersion)
             }
-            uploadGroovyZip(file.getInputStream(), serviceNameVersion)
         }
     }
 
@@ -182,6 +205,122 @@ public class AuthorizeController {
         }
     }
 
+    @PostMapping("/basejars")
+    def uploadBaseJars(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "i") List<String> serverIps) {
+        if (serverIps != null && !serverIps.isEmpty()) {
+            for (String ip : serverIps) {
+                List<MultipartFile> multipartFileList = jarFiles.get(ip)
+                if (multipartFileList == null) {
+                    multipartFileList = new ArrayList<>()
+                    List multipartFileListOld = jarFiles.putIfAbsent(ip, multipartFileList)
+                    if (multipartFileListOld != null) {
+                        multipartFileList = multipartFileListOld
+                    }
+                }
+                multipartFileList.add(file)
+                IOUtils.copy(file.getInputStream(), new FileOutputStream(new File(file.getOriginalFilename())))
+            }
+        }
+    }
+
+    @PostMapping("/allbasejars")
+    def uploadAllBaseJars(HttpServletRequest request) {
+        try {
+            if (!jarFiles.isEmpty()) {
+                for (String ip : jarFiles.keySet()) {
+                    SftpClient sftpClient
+                    List<MultipartFile> multipartFileList = jarFiles.get(ip)
+                    try {
+                        if (multipartFileList != null && !multipartFileList.isEmpty()) {
+                            String reployJar = groovyCloudProp.getProperty("redeploy.jars")
+                            List redeployJars = null
+                            if (reployJar != null) {
+                                redeployJars = Arrays.asList(reployJar.split(","))
+                            }
+                            String contentStr = ""
+                            String tempDir = "groovyCloud_jars" + TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd")
+                            for (MultipartFile file : multipartFileList) {
+                                if (contentStr == "") {
+                                    contentStr += "\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.libs.path")
+                                } else {
+                                    contentStr += "\n\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.libs.path")
+                                }
+                                if (redeployJars.contains(file.getOriginalFilename())) {
+                                    List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatusesByIp(ip)
+                                    if (dockerStatuses != null && !dockerStatuses.isEmpty()) {
+                                        for (DockerStatus dockerStatus : dockerStatuses) {
+                                            String serverType = dockerStatus.getServerType()
+                                            if (serverType != "cloud_win") {
+                                                contentStr += "\n\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.project.path") + serverType
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            File file1 = new File("update.sh")
+                            if (!file1.exists()) {
+                                file1.createNewFile()
+                            }
+                            FileUtils.writeStringToFile(file1, contentStr, "utf8");
+                            String address = groovyCloudProp.getProperty(GROOVYCLOUYDSERVERS1 + ip)
+                            if (address != null) {
+                                address = address.replaceAll(" ", "")
+                                String[] addresses = address.split(",")
+                                String port = addresses[1]
+                                String account = addresses[2]
+                                String passwd = addresses[3]
+                                if (StringUtils.isEmpty(port)) {
+                                    port = "22"
+                                }
+                                if (StringUtils.isEmpty(account)) {
+                                    account = ""
+                                }
+                                if (StringUtils.isEmpty(passwd)) {
+                                    passwd = ""
+                                }
+                                sftpClient = new SftpClient(ip, account, passwd, Integer.valueOf(port))
+                                ShellClient sshClient = new ShellClient(ip, account, passwd, Integer.valueOf(port))
+                                sshClient.excuteCommand("sudo mkdir -p " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir)
+                                sftpClient.uploadByStream(groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir, "update.sh", new FileInputStream(new File("update.sh")))
+                                for (MultipartFile file : multipartFileList) {
+                                    sftpClient.uploadByStream(groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir, file.getOriginalFilename(), new FileInputStream(new File(file.getOriginalFilename())))
+                                }
+                                ShellClient sshClient1 = new ShellClient(ip, account, passwd, Integer.valueOf(port))
+                                sshClient1.excuteCommand("sudo sh " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/update.sh")
+                            }
+                        }
+                    } catch (Throwable t) {
+                        throw new GeneralException(500, "serverIP upload jar failed, ip: " + ip + " ,errMSg: " + org.apache.commons.lang.exception.ExceptionUtils.getFullStackTrace(t))
+                    } finally {
+                        try {
+                            FileUtils.deleteQuietly(new File("update.sh"))
+                        } catch (Throwable t) {
+
+                        }
+                        if (sftpClient != null) {
+                            sftpClient.close()
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            throw t
+        } finally {
+            for (String ip : jarFiles.keySet()) {
+                List<MultipartFile> multipartFileList = jarFiles.get(ip)
+                for (MultipartFile file : multipartFileList) {
+                    try {
+                        FileUtils.deleteQuietly(new File(file.getOriginalFilename()))
+                    } catch (Throwable t) {
+
+                    }
+                }
+            }
+            jarFiles.clear()
+        }
+    }
     @GetMapping("downzips")
     def downloadAllGroovy(HttpServletResponse response) {
         File directory = new File(System.getProperty("user.dir") + File.separator + "scripts");
@@ -209,6 +348,37 @@ public class AuthorizeController {
         FileUtils.deleteQuietly(new File(zipFilePath))
         FileUtils.deleteQuietly(directory)
     }
+    @GetMapping("downzips/{input}")
+    def downloadGroovyByInput(HttpServletResponse response, @PathVariable List input) {
+        List allServiceVersion = getNeedDownServiceVersion(input)
+        if(allServiceVersion != null){
+            File directory = new File(System.getProperty("user.dir") + File.separator + "scripts");
+            List<FileAdapter.FileEntity> files = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx("/"), null, true);
+            for (FileAdapter.FileEntity entity : files) {
+                if(allServiceVersion.contains(entity.getAbsolutePath().split("/")[2])){
+                    FileAdapter.PathEx path = new FileAdapter.PathEx(entity.getAbsolutePath());
+                    FileOutputStream outputStream = FileUtils.openOutputStream(new File(directory.getAbsolutePath() + entity.getAbsolutePath()))
+                    try {
+                        fileAdapter.readFile(path, outputStream);
+                    } finally {
+                        outputStream.close()
+                    }
+                }
+            }
+            String zipFilePath = System.getProperty("user.dir") + File.separator + TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss") + ".zip"
+            com.dobybros.hulkadmin.utils.FileUtils.zipFiles(directory.getAbsolutePath(), zipFilePath)
+            FileInputStream zipfileStream = new FileInputStream(zipFilePath)
+            response.addHeader("Content-Disposition", "attachment;fileName=goorvys.zip");
+            try {
+                IOUtils.copy(zipfileStream, response.getOutputStream())
+            } finally {
+                response.outputStream.close()
+                zipfileStream.close()
+            }
+            FileUtils.deleteQuietly(new File(zipFilePath))
+            FileUtils.deleteQuietly(directory)
+        }
+    }
 
     @GetMapping("/web/{nginxName}/{webName}/{projectName}/{version}")
     def downWeb(@PathVariable String nginxName, @PathVariable String webName, @PathVariable String projectName, @PathVariable String version, HttpServletResponse response) {
@@ -216,7 +386,7 @@ public class AuthorizeController {
             throw new GeneralException(5001, "Version cant be null")
         }
         Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-        if(theNginxMap != null){
+        if (theNginxMap != null) {
             String nginxAccount = theNginxMap.get("account")
             String nginxPort = theNginxMap.get("port")
             String nginxPasswd = theNginxMap.get("passwd")
@@ -251,7 +421,7 @@ public class AuthorizeController {
                     sftpClient.close()
                 }
             }
-        }else {
+        } else {
             throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
         }
     }
@@ -294,47 +464,176 @@ public class AuthorizeController {
         FileUtils.deleteQuietly(new File(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "allconfig"))
     }
 
-    @GetMapping("downconfigsinput/{configsinput}")
-    def downloadConfigs(HttpServletResponse response, @PathVariable String configsinput) {
-        String[] configsInput = configsinput.replaceAll(" ", "").split(",")
+    private Map getConfigServiceVersions() {
         List<Document> configs = serversService.getServerConfigs()
-        File file = new File(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "configsinput");
-        FileOutputStream outputStream = FileUtils.openOutputStream(file)
-        String flag = "\r\n"
-        outputStream.write(("[" + flag).getBytes("utf-8"))
-        int configCount = 0
-        for (int i = 0; i < configs.size(); i++) {
-            Document document = configs.get(i)
-            if (configsInput.contains(document.get("_id"))) {
-                outputStream.write(("{" + flag).getBytes("utf-8"))
-                int count = 0
-                for (String key : document.keySet()) {
-                    if (count == document.size() - 1) {
-                        outputStream.write(("\"" + key + "\"" + ":" + "\"" + document.get(key) + "\"" + flag).getBytes("utf-8"))
-                    } else {
-                        outputStream.write(("\"" + key + "\"" + ":" + "\"" + document.get(key) + "\"," + flag).getBytes("utf-8"))
-                        count++
-                    }
+        Map<String, List> serviceVersionMap = new HashMap()
+        for (Document document : configs) {
+            String serviceVersion = document.get("_id")
+            if (serviceVersion != null) {
+                String[] serviceVersionArray = serviceVersion.split(DeployController.SERVICE_VERSION_SYMBOL)
+                String service = serviceVersionArray[0]
+                String version = serviceVersionArray[1]
+                List serviceVersionList = serviceVersionMap.get(service)
+                if (serviceVersionList == null) {
+                    serviceVersionList = new ArrayList()
+                    serviceVersionMap.put(service, serviceVersionList)
                 }
-                if (configCount == configsInput.length - 1) {
-                    outputStream.write(("}" + flag).getBytes("utf-8"))
-                } else {
-                    outputStream.write(("}," + flag).getBytes("utf-8"))
-                    configCount++
+                if(!serviceVersionList.contains(version)){
+                    serviceVersionList.add(version)
                 }
             }
         }
-        outputStream.write("]".getBytes("utf-8"))
-        outputStream.close()
-        response.addHeader("Content-Disposition", "attachment;fileName=configs");
-        FileInputStream fileInputStream = new FileInputStream(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "configsinput")
-        try {
-            IOUtils.copy(fileInputStream, response.getOutputStream())
-        } finally {
-            response.outputStream.close()
-            fileInputStream.close()
+        return serviceVersionMap
+    }
+
+    private Map getServiceVresions() {
+        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
+        Map serverTypeMap = new HashMap()
+        for (ServiceVersion serviceVersion : serviceVersions) {
+            List serverTypes = serviceVersion.getServerType()
+            for (String serverType : serverTypes) {
+                Map theServerTypeMap = serverTypeMap.get(serverType)
+                if (theServerTypeMap == null) {
+                    theServerTypeMap = new HashMap()
+                    serverTypeMap.put(serverType, theServerTypeMap)
+                }
+                Map theTypeMap = theServerTypeMap.get(serverType)
+                if (theTypeMap == null) {
+                    theTypeMap = new HashMap()
+                    theServerTypeMap.put(serviceVersion.type, theTypeMap)
+                }
+                Map allServiceVersionMap = serviceVersion.serviceVersions
+                for (String service : allServiceVersionMap.keySet()) {
+                    List theVersionList = theTypeMap.get(service)
+                    if (theVersionList == null) {
+                        theVersionList = new ArrayList()
+                        theTypeMap.put(service, theVersionList)
+                    }
+                    if (!theVersionList.contains(serviceVersion.serviceVersions.get(service))) {
+                        theVersionList.add(serviceVersion.serviceVersions.get(service))
+                    }
+                }
+            }
         }
-        FileUtils.deleteQuietly(new File(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "configsinput"))
+        return serverTypeMap
+    }
+    private getNeedDownServiceVersion(List configsinput){
+        List allServiceVersion = new ArrayList()
+        Map serverTypeMap = getServiceVresions()
+        Map configServiceVersionMap = getConfigServiceVersions()
+        while (!configsinput.isEmpty()) {
+            String serverDir = configsinput.get(0)
+            if (serverDir.equals("serverType")) {
+                try {
+                    String serverType = configsinput.get(1)
+                    String type = configsinput.get(2)
+                    String versionType = configsinput.get(3)
+                    Map theServerTypeMap = serverTypeMap.get(serverType)
+                    if (theServerTypeMap != null) {
+                        Map theTypeMap = theServerTypeMap.get(type)
+                        if (theTypeMap != null) {
+                            for (String service : theTypeMap.keySet()) {
+                                if (versionType.equals("currentVersion")) {
+                                    List serviceVersionList = theTypeMap.get(service)
+                                    if (serviceVersionList != null) {
+                                        for (String version : serviceVersionList) {
+                                            String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                                            if (!allServiceVersion.contains(serviceVersion)) {
+                                                allServiceVersion.add(serviceVersion)
+                                            }
+                                        }
+                                    }
+                                } else if (versionType.equals("allVersion")) {
+                                    List serviceVersionList = configServiceVersionMap.get(service)
+                                    if (serviceVersionList != null) {
+                                        for (String version : serviceVersionList) {
+                                            String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                                            if (!allServiceVersion.contains(serviceVersion)) {
+                                                allServiceVersion.add(serviceVersion)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                    for (int i = 0; i < 4; i++) {
+                        configsinput.remove(0)
+                    }
+                }
+            } else if (serverDir.equals("service")) {
+                try {
+                    String service = configsinput.get(1)
+                    String versionType = configsinput.get(2)
+                    List theVersionList = configServiceVersionMap.get(service)
+                    Collections.sort(theVersionList)
+                    if (versionType.equals("latest version")) {
+                        String version = theVersionList.get(theVersionList.size() - 1)
+                        String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                        if (!allServiceVersion.contains(serviceVersion)) {
+                            allServiceVersion.add(serviceVersion)
+                        }
+                    } else if (versionType.equals("allVersion")) {
+                        for (String version : theVersionList){
+                            String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                            if (!allServiceVersion.contains(serviceVersion)) {
+                                allServiceVersion.add(serviceVersion)
+                            }
+                        }
+                    }
+                } finally {
+                    for (int i = 0; i < 3; i++) {
+                        configsinput.remove(0)
+                    }
+                }
+            }
+        }
+        return allServiceVersion
+    }
+    @GetMapping("downconfigs/{configsinput}")
+    def downloadConfigs(HttpServletResponse response, @PathVariable List configsinput) {
+        List allServiceVersion = getNeedDownServiceVersion(configsinput)
+        if(allServiceVersion != null){
+            List<Document> configs = serversService.getServerConfigs()
+            File file = new File(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "configsinput");
+            FileOutputStream outputStream = FileUtils.openOutputStream(file)
+            String flag = "\r\n"
+            outputStream.write(("[" + flag).getBytes("utf-8"))
+            int configCount = 0
+            for (int i = 0; i < configs.size(); i++) {
+                Document document = configs.get(i)
+                if (allServiceVersion.contains(document.get("_id"))) {
+                    outputStream.write(("{" + flag).getBytes("utf-8"))
+                    int count = 0
+                    for (String key : document.keySet()) {
+                        if (count == document.size() - 1) {
+                            outputStream.write(("\"" + key + "\"" + ":" + "\"" + document.get(key) + "\"" + flag).getBytes("utf-8"))
+                        } else {
+                            outputStream.write(("\"" + key + "\"" + ":" + "\"" + document.get(key) + "\"," + flag).getBytes("utf-8"))
+                            count++
+                        }
+                    }
+                    if (configCount == allServiceVersion.size() - 1) {
+                        outputStream.write(("}" + flag).getBytes("utf-8"))
+                    } else {
+                        outputStream.write(("}," + flag).getBytes("utf-8"))
+                        configCount++
+                    }
+                }
+            }
+            outputStream.write("]".getBytes("utf-8"))
+            outputStream.close()
+            response.addHeader("Content-Disposition", "attachment;fileName=configs");
+            FileInputStream fileInputStream = new FileInputStream(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "configsinput")
+            try {
+                IOUtils.copy(fileInputStream, response.getOutputStream())
+            } finally {
+                response.outputStream.close()
+                fileInputStream.close()
+            }
+            FileUtils.deleteQuietly(new File(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "configsinput"))
+        }
     }
 
     @PostMapping("/config")

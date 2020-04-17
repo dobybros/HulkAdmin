@@ -1,15 +1,34 @@
 import request from '@/plugin/axios'
 import util from "@/libs/util";
 
-export function GetAllServerConfigs() {
+export function GetAllServerConfigs(searchInput) {
   return request({
-    url: '/deploy/serverconfig',
+    url: '/deploy/serverconfig?s=' + searchInput,
     method: 'get'
   })
+}
+export function GetServiceConfigs(service, version) {
+    return request({
+        url: '/deploy/serviceconfig/' + service + '/' + version,
+        method: 'get'
+    })
+}
+export function GetServiceConfigsByType() {
+    return request({
+        url: '/deploy/configs/type',
+        method: 'get'
+    })
 }
 export function SaveConfig(data) {
     return request({
         url: '/deploy/serverconfig',
+        method: 'post',
+        data: data
+    })
+}
+export function SaveWithLastConfig(data) {
+    return request({
+        url: '/deploy/serverconfig/withlast',
         method: 'post',
         data: data
     })
@@ -20,9 +39,22 @@ export function RemoveConfig(id) {
         method: 'delete'
     })
 }
-export function GetAllGroovyInfo() {
+export function CheckServiceConfig(service, version) {
     return request({
-        url: '/deploy/groovyzips',
+        url: '/deploy/serviceconfig/healthy?s=' + service + '&v=' + version,
+        method: 'get'
+    })
+}
+
+export function RepairConfig() {
+    return request({
+        url: '/deploy/repairconfig',
+        method: 'get'
+    })
+}
+export function GetAllGroovyInfo(searchInput) {
+    return request({
+        url: '/deploy/groovyzips?s=' + searchInput,
         method: 'get'
     })
 }
@@ -96,6 +128,18 @@ export function ReloadContainer(data) {
         data: data
     })
 }
+export function GetServerIps() {
+    return request({
+        url: '/deploy/container/serverips',
+        method: 'get'
+    })
+}
+export function UploadAllJars() {
+    return request({
+        url: '/open/allbasejars',
+        method: 'post'
+    })
+}
 export function DeleteContainer(server) {
     return request({
         url: '/deploy/container/' + server,
@@ -150,6 +194,24 @@ export function DeleteGwsUser(data, userId) {
         url: '/gc/gws/delete/' + userId,
         method: 'post',
         data: data
+    })
+}
+export function GetKibanaUrl() {
+    return request({
+        url: '/log/page',
+        method: 'get'
+    })
+}
+export function GetAllGCRepairs() {
+    return request({
+        url: '/repair/all',
+        method: 'get'
+    })
+}
+export function GCRepair(id) {
+    return request({
+        url: '/repair/' + id,
+        method: 'post'
     })
 }
 

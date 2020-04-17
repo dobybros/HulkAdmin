@@ -2,11 +2,11 @@
     <el-container>
         <el-main>
             <el-row>
-                <el-col :span="8" style="margin-top: 20px">
+                <el-col :span="3">
                     <el-button type="primary" round @click="newServiceConfig">{{$t("views.deploy.newServiceConfig")}}
                     </el-button>
                 </el-col>
-                <el-col style="flex: 1;margin-top: 20px;margin-right: 120px" :span="4">
+                <el-col style="flex: 1;margin-right: 120px" :span="1">
                     <el-upload
                             ref="upload"
                             :action="uploadConfig()"
@@ -18,33 +18,42 @@
                                 class="el-icon-upload el-icon--right"></i></el-button>
                     </el-upload>
                 </el-col>
-                <el-col :span="5" style="margin-top: 20px">
-                    <a style="color: #0000cc;border-color: #000fff" target="_blank"
-                       :href="downloadGroovyUrl + '/open/downconfigs'">
-                        <el-button type="success">{{$t("views.deploy.ExportAllConfig")}}</el-button>
-                    </a>
+                <el-col :span="3" style="margin-bottom: 10px">
+                    <el-button type="primary" @click="repairConfig">{{$t("views.deploy.repairConfig")}}</el-button>
                 </el-col>
-            </el-row>
-            <el-row>
-                <el-col :span="14" style="margin-top: 5px;margin-bottom: 10px">
-                    <el-input v-model="exportConfigs" placeholder="Please enter the config name, separated by commas"></el-input>
+                <el-col :span="7" style="margin-bottom: 10px">
+                    <el-cascader
+                            style="width: 500px"
+                            placeholder="select or search configs to download"
+                            :options="servicesData"
+                            :props="{multiple: true}"
+                            v-model="cascaderValue"
+                            filterable></el-cascader>
                 </el-col>
-                <el-col :span="5" style="margin-top: 5px;margin-bottom: 10px">
+                <el-col :span="3" style="margin-bottom: 10px;margin-right: 1px">
                     <a style="color: #0000cc;border-color: #000fff" target="_blank"
-                       :href="downloadGroovyUrl + '/open/downconfigsinput/' + exportConfigs">
+                       :href="downloadGroovyUrl + '/open/downconfigs/' + cascaderValue">
                         <el-button type="success">{{$t("views.deploy.ExportConfig")}}</el-button>
                     </a>
+                </el-col>
+                <el-col :span="1" style="margin-bottom: 20px;">
+                    <el-input style="width: 300px" v-model="searchInput" placeholder="input serverType or serviceName" @change="search" suffix-icon="el-icon-search"></el-input>
                 </el-col>
             </el-row>
             <el-table
                     :data="tableData"
                     border
-                    style="width: 70%"
+                    style="width: 100%"
+                    row-key="id"
+                    :tree-props="{children: 'children', hasChildren: true}"
                     height="600px">
                 <el-table-column
-                        prop="_id.value"
-                        label="ServiceName"
-                        width="400">
+                        prop="service"
+                        label="service">
+                </el-table-column>
+                <el-table-column
+                        prop="version"
+                        label="version">
                 </el-table-column>
                 <el-table-column
                         fixed="right"
@@ -87,6 +96,7 @@
                            @click="addConfigField"></el-button>
                 <el-button @click="cancelEdit">Cancel</el-button>
                 <el-button type="primary" @click="saveConfig">Save</el-button>
+                <el-button type="primary" @click="saveWithLastConfig">Save with last version</el-button>
             </div>
         </el-dialog>
         <el-dialog
@@ -101,9 +111,15 @@
         </el-dialog>
     </el-container>
 </template>
-
 <script>
-    import {GetAllServerConfigs, SaveConfig, RemoveConfig} from "@api/deploy.api";
+    import {
+        GetAllServerConfigs,
+        SaveConfig,
+        SaveWithLastConfig,
+        RemoveConfig,
+        RepairConfig,
+        GetServiceConfigs
+    } from "@api/deploy.api";
 
     export default {
         methods: {
@@ -113,21 +129,73 @@
                 rows.splice(index, 1);
             },
             dialogTableVisible(data) {
-                this.dialogFormVisible = true
-                this.everyData = data
-                if (this.everyData["_id"] !== undefined && this.everyData["_id"]["value"] !== undefined) {
-                    this.configName = this.everyData["_id"]["value"] + " config"
-                }
+                GetServiceConfigs(data.service, data.version)
+                    .then(resp => {
+                        this.everyData = resp
+                        this.dialogFormVisible = true
+                        if (this.everyData["_id"] !== undefined && this.everyData["_id"]["value"] !== undefined) {
+                            this.configName = this.everyData["_id"]["value"] + " config"
+                        }
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
             },
             saveConfig() {
+                if (this.newConfig === false) {
+                    if (!this.configName.includes(this.everyData._id.value)) {
+                        this.newConfig = true
+                    }
+                }
                 SaveConfig(this.everyData)
                     .then(resp => {
                         this.$message.success("Success!")
-                        this.deleteDataCache = {}
-                        this.addDataCache = {}
                         this.dialogFormVisible = false
                         this.configName = ""
                         this.everyData = {}
+                        if (this.newConfig === true) {
+                            location.reload()
+                        }
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
+            },
+            search(){
+                GetAllServerConfigs(this.searchInput)
+                    .then(resp => {
+                        this.$message.success("update!")
+                        this.tableData = resp.list
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
+            },
+            saveWithLastConfig() {
+                if (this.newConfig === false) {
+                    if (!this.configName.includes(this.everyData._id.value)) {
+                        this.newConfig = true
+                    }
+                }
+                SaveWithLastConfig(this.everyData)
+                    .then(resp => {
+                        this.$message.success("Success!")
+                        this.dialogFormVisible = false
+                        this.configName = ""
+                        this.everyData = {}
+                        if (this.newConfig === true) {
+                            location.reload()
+                        }
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
+            },
+            repairConfig() {
+                RepairConfig()
+                    .then(resp => {
+                        location.reload()
+                        this.$message.success("Success!")
                     })
                     .catch(err => {
                         this.$message.error(err);
@@ -137,29 +205,31 @@
                 this.$set(this.everyData, "", {key: "", value: ""})
             },
             removeConfigField(key) {
-                this.$set(this.deleteDataCache, key, this.everyData[key])
                 this.$delete(this.everyData, key)
             },
             removeConfig(id) {
                 RemoveConfig(id)
                     .then(resp => {
                         this.$message.success("Success!")
-                        this.tableData.splice(this.index, 1)
                         this.deleteConfigName = ""
                         this.index = -1
+                        location.reload()
                     })
                     .catch(err => {
                         this.$message.error(err);
                     })
             },
             newServiceConfig() {
-                this.tableData.push({"_id": {key: "_id", value: ""}})
-                this.$set(this.addDataCache, "_id", {key: "_id", value: ""})
-                this.dialogTableVisible(this.tableData[this.tableData.length - 1])
+                this.newConfig = true
+                this.dialogFormVisible = true
+                this.everyData = {"_id": {key: "_id", value: ""}}
+                this.configName = "new config"
             },
             cancelEdit() {
-                location.reload()
-                // this.dialogFormVisible = false
+                // location.reload()
+                this.configName = ""
+                this.dialogFormVisible = false
+                this.everyData = {}
                 // for (let key in this.deleteDataCache) {
                 //     this.$set(this.everyData, key, this.deleteDataCache[key])
                 // }
@@ -174,7 +244,7 @@
                 // }
                 // this.deleteDataCache = {}
                 // this.addDataCache = {}
-                // this.configName = ""
+
             },
             cancelDelete() {
                 this.deleteDialogVisible = false
@@ -184,7 +254,6 @@
             onKey(key, value) {
                 if (key !== "" && value !== "") {
                     this.$set(this.everyData, key, {key: key, value: value})
-                    this.$set(this.addDataCache, key, {key: key, value: value})
                     this.$delete(this.everyData, "")
                     let keyData = this.everyData[key]["key"]
                     for (let name in this.everyData) {
@@ -198,7 +267,7 @@
             },
             openDeleteDialog(index, data, rows) {
                 this.deleteDialogVisible = true
-                this.deleteConfigName = data["_id"]["value"]
+                this.deleteConfigName = data["service"] + "_v" + data["version"]
                 this.index = index
             },
             uploadConfig: function () {
@@ -224,21 +293,24 @@
                 index: -1,
                 deleteConfigName: "",
                 everyData: {},
-                deleteDataCache: {},
-                addDataCache: {},
                 tableData: [],
                 dialogFormVisible: false,
                 deleteDialogVisible: false,
                 downloadGroovyUrl: '',
                 fileList: [],
-                exportConfigs: ''
+                exportConfigs: '',
+                newConfig: false,
+                servicesData: [],
+                cascaderValue: [],
+                searchInput: ''
             }
         },
         created() {
             GetAllServerConfigs()
                 .then(resp => {
                     this.$message.success("Get all config success!")
-                    this.tableData = resp
+                    this.tableData = resp.list
+                    this.servicesData = resp.downList
                     let uploadHost = ''
                     if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
                         uploadHost = location.protocol + "//" + location.host

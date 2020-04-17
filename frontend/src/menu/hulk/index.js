@@ -42,6 +42,16 @@ export default {
             path: `${pre}gcMemory`,
             title: 'GCMemory ',
             icon: 'commenting'
+        },
+        {
+            path: `${pre}gcRepair`,
+            title: 'GCRepair ',
+            icon: 'commenting'
+        },
+        {
+            path: `${pre}serverLogs`,
+            title: 'Server Logs ',
+            icon: 'commenting'
         }
     ])("/hulk/")
 }

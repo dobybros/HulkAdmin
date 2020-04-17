@@ -2,11 +2,11 @@
     <el-container>
         <el-main>
             <el-row>
-                <el-col :span="9">
+                <el-col :span="3">
                     <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.addNewService")}}
                     </el-button>
                 </el-col>
-                <el-col :span="9">
+                <el-col :span="3">
                     <el-upload
                             accept=".zip"
                             ref="upload"
@@ -19,22 +19,33 @@
                                 class="el-icon-upload el-icon--right"></i></el-button>
                     </el-upload>
                 </el-col>
+                <el-col :span="7">
+                    <el-cascader
+                            style="width: 500px"
+                            placeholder="select or search groovys to download"
+                            :options="groovyData"
+                            :props="{multiple: true}"
+                            v-model="cascaderValue"
+                            filterable></el-cascader>
+                </el-col>
                 <el-col :span="4">
                     <a style="color: #0000cc;border-color: #000fff" target="_blank"
-                       :href="downloadGroovyUrl + '/open/downzips'">
-                        <el-button type="success">{{$t("views.deploy.downloadAllGroovy")}}</el-button>
+                       :href="downloadGroovyUrl + '/open/downzips/' + cascaderValue">
+                        <el-button type="success">{{$t("views.deploy.downloadGroovys")}}</el-button>
                     </a>
                 </el-col>
+                <el-col :span="1" style="margin-bottom: 20px;">
+                    <el-input style="width: 300px" v-model="searchInput" placeholder="input serverType or serviceName" @change="search" suffix-icon="el-icon-search"></el-input>
+                </el-col>
             </el-row>
-
             <div>
                 <el-table
                         :data="tableData"
-                        style="width: 90%;"
-                        row-key="serviceName"
+                        style="width: 100%;"
+                        row-key="id"
                         height="550px"
                         border
-                        :tree-props="{children: 'allVersion'}">
+                        :tree-props="{children: 'children', hasChildren: true}">
                     <el-table-column
                             prop="serviceName"
                             label="service"
@@ -106,10 +117,10 @@
                             class="upload-demo"
                             ref="upload"
                             :action="uploadUrlData"
+                            :before-upload="beforeUploadGroovy"
                             :file-list="fileList"
-                            :limit="1"
                             :auto-upload="false">
-                <el-button slot="trigger" size="medium" type="primary">{{$t("views.deploy.selectFile")}}</el-button>
+                <el-button slot="trigger" size="medium" type="primary">{{$t("views.deploy.upload")}}</el-button>
                 <el-button style="margin-left: 10px;" size="medium" type="success"
                            @click="submitUpload">{{$t("views.deploy.upload")}}</el-button>
                     </el-upload>
@@ -171,7 +182,7 @@
     </el-container>
 </template>
 <script>
-    import {GetAllGroovyInfo, DeleteServiceVersion, RemoveService, DownloadAllGroovy} from "@api/deploy.api";
+    import {GetAllGroovyInfo, DeleteServiceVersion, RemoveService, DownloadAllGroovy, CheckServiceConfig} from "@api/deploy.api";
     import util from '@/libs/util'
 
     export default {
@@ -193,14 +204,18 @@
                 downValue: '',
                 downloadServiceName: '',
                 downloadGroovyUrl: '',
-                downloadDirectory: ''
+                downloadDirectory: '',
+                groovyData: [],
+                cascaderValue: [],
+                searchInput: ''
             }
         },
         created() {
             GetAllGroovyInfo()
                 .then(resp => {
                     this.$message.success("Updated!")
-                    this.tableData = resp
+                    this.tableData = resp.list
+                    this.groovyData = resp.downList
                     let uploadHost = ''
                     if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
                         uploadHost = location.protocol + "//" + location.host
@@ -217,10 +232,12 @@
             uploadSuccess(res, file, fileList) {
                 if (res.code === 1) {
                     this.$message.success("File " + file.name + " Upload Success!")
+                    location.reload()
                 } else {
-                    this.$message.success("File " + file.name + "Upload Failed!")
+                    this.$message.error("File " + file.name + "Upload Failed! errMsg: " + res.message)
                 }
                 this.geoovysList = []
+                this.fileList = []
             },
             openUploadDialog(data) {
                 this.dialogVisible = true
@@ -236,80 +253,93 @@
             uploadGroovys(num) {
                 return this.downloadGroovyUrl + "/open/groovyzips"
             },
+            beforeUploadGroovy(){
+                CheckServiceConfig(this.serviceName, this.value)
+                    .then(resp => {
+                        if(!resp.result){
+                            this.$message.error("Cant find config of " + resp.service + ", need configure first")
+                        }
+                        return resp
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
+            },
             submitUpload() {
                 if (this.value !== null && this.serviceName !== null && this.value !== '' && this.serviceName !== '') {
                     if (this.$refs.upload.uploadFiles.length > 0) {
                         this.$refs.upload.submit();
-                        let thisValue = ''
-                        if (this.value.split(":")[1] !== undefined) {
-                            thisValue = this.value.split(":")[1].trim()
-                        } else {
-                            thisValue = this.value
-                        }
-                        if (this.everyData["maxVersion"] !== undefined) {
-                            if (thisValue > this.everyData["maxVersion"].trim()) {
-                                let oldVersion = this.everyData["version"]
-                                let oldDate = this.everyData["date"]
-                                this.everyData["allVersion"].unshift({
-                                    "serviceName": this.serviceName,
-                                    "version": oldVersion,
-                                    "date": oldDate
-                                })
-                                this.everyData["versions"].unshift({"value": "version: " + thisValue})
-                                this.everyData["maxVersion"] = thisValue
-                                this.everyData["version"] = thisValue
-                                this.everyData["date"] = this.timeFormat(new Date().getTime())
-                            } else if (thisValue === this.everyData["maxVersion"].trim()) {
-                                this.everyData["date"] = this.timeFormat(new Date().getTime())
-                            } else if (thisValue < this.everyData["maxVersion"].trim()) {
-                                let existItem = false
-                                for (let i = 0; i < this.everyData["allVersion"].length; i++) {
-                                    let data3 = this.everyData["allVersion"][i]
-                                    if (data3["version"] === thisValue) {
-                                        existItem = true
-                                        data3["date"] = this.timeFormat(new Date().getTime())
-                                    }
-                                }
-                                if (!existItem) {
-                                    for (let i = 0; i < this.everyData["allVersion"].length; i++) {
-                                        let data3 = this.everyData["allVersion"][i]
-                                        if (thisValue > data3["version"]) {
-                                            existItem = true
-                                            this.everyData["versions"].splice(i + 1, 0, {"value": "version: " + thisValue})
-                                            this.everyData["allVersion"].splice(i, 0, {
-                                                "version": thisValue,
-                                                "serviceName": this.serviceName,
-                                                "date": this.timeFormat(new Date().getTime())
-                                            })
-                                            break
-                                        }
-                                    }
-                                }
-                                if (!existItem) {
-                                    this.everyData["versions"].push({"value": "version: " + thisValue})
-                                    this.everyData["allVersion"].push({
-                                        "version": thisValue,
-                                        "serviceName": this.serviceName,
-                                        "date": this.timeFormat(new Date().getTime())
-                                    })
-                                }
-                            }
-                        } else {
-                            this.tableData.push({
-                                "maxVersion": thisValue,
-                                "version": thisValue,
-                                "serviceName": this.serviceName,
-                                "date": this.timeFormat(new Date().getTime()),
-                                "versions": [{"value": "version: " + thisValue}],
-                                "allVersion": []
-                            })
-                        }
+                        // let thisValue = ''
+                        // if (this.value.split(":")[1] !== undefined) {
+                        //     thisValue = this.value.split(":")[1].trim()
+                        // } else {
+                        //     thisValue = this.value
+                        // }
+                        // if (this.everyData["maxVersion"] !== undefined) {
+                        //     if (thisValue > this.everyData["maxVersion"].trim()) {
+                        //         let oldVersion = this.everyData["version"]
+                        //         let oldDate = this.everyData["date"]
+                        //         this.everyData["children"].unshift({
+                        //             "serviceName": this.serviceName,
+                        //             "version": oldVersion,
+                        //             "date": oldDate
+                        //         })
+                        //         this.everyData["versions"].unshift({"value": "version: " + thisValue})
+                        //         this.everyData["maxVersion"] = thisValue
+                        //         this.everyData["version"] = thisValue
+                        //         this.everyData["date"] = this.timeFormat(new Date().getTime())
+                        //     } else if (thisValue === this.everyData["maxVersion"].trim()) {
+                        //         this.everyData["date"] = this.timeFormat(new Date().getTime())
+                        //     } else if (thisValue < this.everyData["maxVersion"].trim()) {
+                        //         let existItem = false
+                        //         for (let i = 0; i < this.everyData["children"].length; i++) {
+                        //             let data3 = this.everyData["children"][i]
+                        //             if (data3["version"] === thisValue) {
+                        //                 existItem = true
+                        //                 data3["date"] = this.timeFormat(new Date().getTime())
+                        //             }
+                        //         }
+                        //         if (!existItem) {
+                        //             for (let i = 0; i < this.everyData["children"].length; i++) {
+                        //                 let data3 = this.everyData["children"][i]
+                        //                 if (thisValue > data3["version"]) {
+                        //                     existItem = true
+                        //                     this.everyData["versions"].splice(i + 1, 0, {"value": "version: " + thisValue})
+                        //                     this.everyData["children"].splice(i, 0, {
+                        //                         "version": thisValue,
+                        //                         "serviceName": this.serviceName,
+                        //                         "date": this.timeFormat(new Date().getTime())
+                        //                     })
+                        //                     break
+                        //                 }
+                        //             }
+                        //         }
+                        //         if (!existItem) {
+                        //             this.everyData["versions"].push({"value": "version: " + thisValue})
+                        //             this.everyData["children"].push({
+                        //                 "version": thisValue,
+                        //                 "serviceName": this.serviceName,
+                        //                 "date": this.timeFormat(new Date().getTime())
+                        //             })
+                        //         }
+                        //     }
+                        // } else {
+                        //     this.tableData.push({
+                        //         "maxVersion": thisValue,
+                        //         "version": thisValue,
+                        //         "serviceName": this.serviceName,
+                        //         "date": this.timeFormat(new Date().getTime()),
+                        //         "versions": [{"value": "version: " + thisValue}],
+                        //         "children": []
+                        //     })
+                        // }
                         this.dialogVisible = false
                         this.$refs.upload.uploadFiles = []
                         this.value = ''
                         this.uploadUrlData = ''
                         this.serviceName = ''
                         this.fileList = []
+                        // location.reload()
                     } else {
                         this.$message.error('Please select a file to upload!');
                     }
@@ -334,49 +364,50 @@
                 DeleteServiceVersion(this.serviceName, this.value)
                     .then(resp => {
                         this.$message.success("Success!")
-                        let deleteValue = ''
-                        if (this.value.split(":")[1] !== undefined) {
-                            deleteValue = this.value.split(":")[1].trim()
-                        } else {
-                            deleteValue = this.value.trim()
-                        }
-                        if (deleteValue === this.everyData["maxVersion"].trim()) {
-                            let data = this.everyData["allVersion"][0]
-                            if (data !== undefined) {
-                                this.everyData["maxVersion"] = data["version"]
-                                this.everyData["version"] = data["version"]
-                                this.everyData["date"] = data["date"]
-                            }
-                            this.everyData["allVersion"].splice(0, 1)
-                            this.everyData["versions"].splice(0, 1)
-                        } else {
-                            for (let i = 0; i < this.everyData["allVersion"].length; i++) {
-                                let containMao = ''
-                                if (this.value.split(":")[1] !== undefined) {
-                                    containMao = this.value.split(":")[1].trim()
-                                } else {
-                                    containMao = this.value
-                                }
-                                let data1 = this.everyData["allVersion"][i]
-                                if (data1["version"] === containMao) {
-                                    this.everyData["allVersion"].splice(i, 1)
-                                }
-                            }
-                            for (let i = 0; i < this.everyData["versions"].length; i++) {
-                                let versionVlue = ''
-                                if (this.value.split(":")[1] !== undefined) {
-                                    versionVlue = this.value
-                                } else {
-                                    versionVlue = "version: " + this.value
-                                }
-                                let data2 = this.everyData["versions"][i]
-                                if (data2["value"] === versionVlue) {
-                                    this.everyData["versions"].splice(i, 1)
-                                }
-                            }
-                        }
-                        this.dialogVisible = false
-                        this.deleteServiceName = ''
+                        location.reload()
+                        // let deleteValue = ''
+                        // if (this.value.split(":")[1] !== undefined) {
+                        //     deleteValue = this.value.split(":")[1].trim()
+                        // } else {
+                        //     deleteValue = this.value.trim()
+                        // }
+                        // if (deleteValue === this.everyData["maxVersion"].trim()) {
+                        //     let data = this.everyData["children"][0]
+                        //     if (data !== undefined) {
+                        //         this.everyData["maxVersion"] = data["version"]
+                        //         this.everyData["version"] = data["version"]
+                        //         this.everyData["date"] = data["date"]
+                        //     }
+                        //     this.everyData["children"].splice(0, 1)
+                        //     this.everyData["versions"].splice(0, 1)
+                        // } else {
+                        //     for (let i = 0; i < this.everyData["children"].length; i++) {
+                        //         let containMao = ''
+                        //         if (this.value.split(":")[1] !== undefined) {
+                        //             containMao = this.value.split(":")[1].trim()
+                        //         } else {
+                        //             containMao = this.value
+                        //         }
+                        //         let data1 = this.everyData["children"][i]
+                        //         if (data1["version"] === containMao) {
+                        //             this.everyData["children"].splice(i, 1)
+                        //         }
+                        //     }
+                        //     for (let i = 0; i < this.everyData["versions"].length; i++) {
+                        //         let versionVlue = ''
+                        //         if (this.value.split(":")[1] !== undefined) {
+                        //             versionVlue = this.value
+                        //         } else {
+                        //             versionVlue = "version: " + this.value
+                        //         }
+                        //         let data2 = this.everyData["versions"][i]
+                        //         if (data2["value"] === versionVlue) {
+                        //             this.everyData["versions"].splice(i, 1)
+                        //         }
+                        //     }
+                        // }
+                        // this.dialogVisible = false
+                        // this.deleteServiceName = ''
                     })
                     .catch(err => {
                         this.$message.error(err);
@@ -384,6 +415,16 @@
             },
             newServiceVersion() {
                 this.openUploadDialog()
+            },
+            search(){
+                GetAllGroovyInfo(this.searchInput)
+                    .then(resp => {
+                        this.$message.success("Updated!")
+                        this.tableData = resp.list
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
             },
             timeFormat(timeStamp) {
                 let year = new Date(timeStamp).getFullYear();

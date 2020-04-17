@@ -154,7 +154,7 @@
                 if (res.code === 1) {
                     this.$message.success("File " + file.name + " Upload Success!")
                 } else {
-                    this.$message.success("File " + file.name + "Upload Failed!")
+                    this.$message.error("File " + file.name + "Upload Failed!")
                 }
                 this.fileList = []
             },

@@ -172,11 +172,16 @@
       "add": "Add",
       "download": "Download",
       "downloadAllGroovy": "Download All Groovy",
+      "downloadGroovys": "downloadGroovys",
       "ExportAllConfig": "Export All Config",
       "ExportConfig": "Export config",
       "ImportConfig": "Import Config",
       "uploadGroovys": "Upload Groovys",
-      "loadWebs": "Load"
+      "loadWebs": "Load",
+      "AddBaseJars": "Add the underlying jars",
+      "repairConfig": "repair config",
+      "repair": "Repair",
+      "search": "Search"
     },
     "system": {
       "error": {

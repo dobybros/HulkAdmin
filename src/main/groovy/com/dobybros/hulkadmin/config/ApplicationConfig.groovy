@@ -13,8 +13,6 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Component
 class ApplicationConfig {
-    @Value('${remote.service.host}')
-    public String remoteServiceHost
     @Value('${gridfs.host}')
     public String gridfsHost
     @Value('${gridfs.files.dbname}')
@@ -45,5 +43,7 @@ class ApplicationConfig {
     public String mongoPassword
     @Value('${database.host}')
     public String databaseHost
+    @Value('${log.kibana.url}')
+    public String logKibanaUrl
 
 }

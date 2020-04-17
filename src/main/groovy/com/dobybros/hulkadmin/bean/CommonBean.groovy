@@ -5,10 +5,12 @@ import com.docker.file.adapters.GridFSFileHandler
 import com.docker.rpc.remote.stub.ServiceStubManager
 import com.docker.storage.adapters.ServiceVersionService
 import com.docker.storage.adapters.impl.DockerStatusServiceImpl
+import com.docker.storage.adapters.impl.RepairServiceImpl
 import com.docker.storage.adapters.impl.ServersServiceImpl
 import com.docker.storage.adapters.impl.ServiceVersionServiceImpl
 import com.docker.storage.mongodb.MongoHelper
 import com.docker.storage.mongodb.daos.DockerStatusDAO
+import com.docker.storage.mongodb.daos.RepairDAO
 import com.docker.storage.mongodb.daos.ServersDAO
 import com.docker.storage.mongodb.daos.ServiceVersionDAO
 import org.apache.catalina.Context
@@ -55,6 +57,10 @@ class CommonBean {
     public ServersServiceImpl serversService(){
         return new ServersServiceImpl()
     }
+    @Bean
+    public RepairServiceImpl repairService(){
+        return new RepairServiceImpl()
+    }
 
     @Bean
     public ServersDAO serversDAO(){
@@ -69,6 +75,20 @@ class CommonBean {
         serversDAO.setMongoHelper(configHelper);
         serversDAO.init()
         return serversDAO
+    }
+    @Bean
+    public RepairDAO repairDAO(){
+        MongoHelper repairHelper = new MongoHelper();
+        repairHelper.setHost(applicationConfig.databaseHost);
+        repairHelper.setConnectionsPerHost(Integer.valueOf(applicationConfig.connectionsPerHost));
+        repairHelper.setDbName("extras");
+        repairHelper.setUsername(applicationConfig.mongoUserName);
+        repairHelper.setPassword(applicationConfig.mongoPassword);
+        repairHelper.init()
+        RepairDAO repairDAO = new RepairDAO();
+        repairDAO.setMongoHelper(repairHelper);
+        repairDAO.init()
+        return repairDAO
     }
     @Bean
     public DockerStatusServiceImpl dockerStatusService(){

@@ -3,6 +3,7 @@ package com.dobybros.hulkadmin.controllers
 import chat.json.Result
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
+import com.dobybros.hulkadmin.general.GeneralException
 import com.docker.data.DockerStatus
 import com.docker.data.Service
 import com.docker.storage.adapters.impl.DockerStatusServiceImpl
@@ -98,7 +99,7 @@ class GroovyCloudController {
             if (address != null) {
                 String url = address + "/base/" + params[1] + "/" + params[2]
                 Result result = ScriptHttpUtils.post(null, url, null, Result.class)
-                if (result != null) {
+                if (result != null && result.success()) {
                     List list = new ArrayList()
                     if (params[2].contains("gws")) {
                         JSONObject jsonObject = result.getData()
@@ -108,8 +109,8 @@ class GroovyCloudController {
                                 Map userIdMap
                                 for (String userId : onlineUserMap.keySet()) {
                                     Map onlineServiceUserMap = onlineUserMap.get(userId)
-                                    if(onlineServiceUserMap != null){
-                                        for (String service : onlineServiceUserMap.keySet()){
+                                    if (onlineServiceUserMap != null) {
+                                        for (String service : onlineServiceUserMap.keySet()) {
                                             userIdMap = new HashMap()
                                             userIdMap.put("userId", userId)
                                             userIdMap.put("service", service)
@@ -125,6 +126,10 @@ class GroovyCloudController {
                     } else {
                         return ["data": JSON.toJSONString(result.getData(), true)]
                     }
+                } else {
+                    if(result != null){
+                        throw new GeneralException(result.getCode(), result.getMsg())
+                    }
                 }
             }
         }
@@ -138,7 +143,7 @@ class GroovyCloudController {
             if (address != null) {
                 String url = address + "/rest/" + params[2] + "/sys/destroy/theuser/" + userId
                 Result result = ScriptHttpUtils.get(url, Result.class)
-                if(result != null && result.getCode() == 1){
+                if (result != null && result.getCode() == 1) {
                     return getGCDataPrivate(params)
                 }
             }

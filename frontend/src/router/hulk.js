@@ -59,6 +59,18 @@ export default {
             name: `${pre}/gcMemory`,
             component: _import('hulk/gcMemory/index'),
             meta: {...meta, title: `GCMemory`}
+        },
+        {
+            path: `gcRepair`,
+            name: `${pre}/gcRepair`,
+            component: _import('hulk/gcRepair/index'),
+            meta: {...meta, title: `GCRepair`}
+        },
+        {
+            path: `serverLogs`,
+            name: `${pre}/serverLogs`,
+            component: _import('hulk/serverLogs/index'),
+            meta: {...meta, title: `Server Logs`}
         }
     ])('hulk-admin-')
 }
