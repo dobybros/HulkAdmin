@@ -4,6 +4,7 @@ import chat.logs.LoggerEx
 import com.dobybros.hulkadmin.config.ApplicationConfig
 import com.dobybros.hulkadmin.config.NginxConfig
 import com.dobybros.hulkadmin.general.GeneralException
+import com.dobybros.hulkadmin.general.Logger
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
