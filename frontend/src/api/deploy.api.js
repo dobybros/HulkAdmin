@@ -247,9 +247,9 @@ export function GetTransactions() {
     })
 }
 
-export function GetTransactionInfos(transactionType, status = [0,1,2], loadSize = '', skip = 0, size = 10, startTime = '', endTime = '', stage = '') {
+export function GetTransactionInfos(transactionType, status = [0,1,2], loadSize = '', skip = 0, size = 10, startTime = '', endTime = '', stage = '', tid = '') {
     return request({
-        url: `/dts/transactioninfos?transactiontype=${transactionType}&status=${status}&loadSize=${loadSize}&skip=${skip}&size=${size}&startTime=${startTime}&endTime=${endTime}&stage=${stage}`,
+        url: `/dts/transactioninfos?transactiontype=${transactionType}&status=${status}&loadSize=${loadSize}&skip=${skip}&size=${size}&startTime=${startTime}&endTime=${endTime}&stage=${stage}&tid=${tid}`,
         method: 'get'
     })
 }

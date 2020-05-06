@@ -97,14 +97,27 @@
             <el-dialog title="TransactionInfos" :visible.sync="dialogTableVisible" width="80%"
                        :before-close="handleClose">
                 <el-row>
+                    <el-col :span="12">
                     <el-button @click="allTransactionInfo" :class="{active : transactionInfoFilter.transactionType == ''}">All</el-button>
                     <el-button @click="currentTransactionInfo" :class="{active : transactionInfoFilter.transactionType != ''}">Current</el-button>
+                    </el-col>
+                    <el-col :span="12">
+                        <el-input
+                    placeholder="Please input transaction id"
+                    prefix-icon="el-icon-search"
+                    clearable="true"
+                    v-model="transactionInfoFilter.searchInput"
+                    @keyup.enter.native="refreshTransactionInfos">
+                        </el-input>
+                    </el-col>
+
                 </el-row>
                 <el-table :data="transactionInfos"
                           :loading="transactionInfoLoading"
                           ref="transactionInfoTable"
                           stripe
                           @filter-change="handleOperationFilterChange">
+                    <el-table-column property="id" label="ID"></el-table-column>
                     <el-table-column property="transactionType" label="TransactionType"></el-table-column>
                     <el-table-column property="stage" label="Stage"
                                      columnKey="stage"
@@ -144,7 +157,7 @@
                     <el-table-column label="Operations">
                         <template slot-scope="scope">
                             <el-button type="primary" v-if="scope.row.status == 0"
-                                       @click="retryFailedTransaction(transactionInfoFilter.transactionType, [scope.row.id])">
+                                       @click="retryFailedTransaction(scope.row.transactionType, [scope.row.id])">
                                 Retry
                             </el-button>
                         </template>
@@ -180,7 +193,8 @@
                     loadSize: true,
                     startTime: '',
                     endTime: '',
-                    stage: ''
+                    stage: '',
+                    searchInput: ''
                 },
                 transactionInfoPage: {
                     total: 0,
@@ -324,7 +338,7 @@
             },
             refreshTransactionInfos() {
                 this.transactionInfoLoading = true
-                GetTransactionInfos(this.transactionInfoFilter.transactionType, this.transactionInfoFilter.status, this.transactionInfoFilter.loadSize, (this.transactionInfoPage.currentPage - 1) * this.transactionInfoPage.limit, this.transactionInfoPage.limit, this.transactionInfoFilter.startTime, this.transactionInfoFilter.endTime, this.transactionInfoFilter.stage)
+                GetTransactionInfos(this.transactionInfoFilter.transactionType, this.transactionInfoFilter.status, this.transactionInfoFilter.loadSize, (this.transactionInfoPage.currentPage - 1) * this.transactionInfoPage.limit, this.transactionInfoPage.limit, this.transactionInfoFilter.startTime, this.transactionInfoFilter.endTime, this.transactionInfoFilter.stage, this.transactionInfoFilter.searchInput)
                     .then(res => {
                         this.transactionInfoLoading = false
                         this.transactionInfoPage.total = res.total

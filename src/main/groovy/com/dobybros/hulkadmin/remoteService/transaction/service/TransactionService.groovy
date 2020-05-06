@@ -23,7 +23,7 @@ interface TransactionService {
 
     public Boolean deleteTransactionInfo(String transactionId)
 
-    public def getTransactionInfos(String transactionType, Long startTime, Long endTime, List<Integer> status, Integer skip, Integer size, Boolean loadSize, String stage)
+    public def getTransactionInfos(String transactionType, Long startTime, Long endTime, List<Integer> status, Integer skip, Integer size, Boolean loadSize, String stage, String transactionInfoId)
 
     public void retryFailedTansactions(String transactiontype, List<String> ids)
 

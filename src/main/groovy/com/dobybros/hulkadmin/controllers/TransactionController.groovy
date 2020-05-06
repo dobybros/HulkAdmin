@@ -39,9 +39,10 @@ class TransactionController {
                             @RequestParam Integer size,
                             @RequestParam Long startTime,
                             @RequestParam Long endTime,
-                            @RequestParam String stage) {
+                            @RequestParam String stage,
+                            @RequestParam String tid) {
         TransactionService transactionService = serviceStubManager.getService(TransactionService.SERVICE, TransactionService.class)
-        return transactionService.getTransactionInfos(transactiontype, startTime, endTime, status, skip, size, loadSize, stage)
+        return transactionService.getTransactionInfos(transactiontype, startTime, endTime, status, skip, size, loadSize, stage, tid)
     }
     @PostMapping('/transaction/{transactiontype}/retry')
     def retryTransaction(@PathVariable String transactiontype, @RequestBody List<String> ids) {
