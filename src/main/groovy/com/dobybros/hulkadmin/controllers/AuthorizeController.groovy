@@ -242,17 +242,18 @@ public class AuthorizeController {
                             String contentStr = ""
                             String tempDir = "groovyCloud_jars" + TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd")
                             for (MultipartFile file : multipartFileList) {
-                                if (contentStr == "") {
-                                    contentStr += "\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.libs.path")
-                                } else {
-                                    contentStr += "\n\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.libs.path")
-                                }
-                                if (redeployJars.contains(file.getOriginalFilename())) {
-                                    List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatusesByIp(ip)
-                                    if (dockerStatuses != null && !dockerStatuses.isEmpty()) {
-                                        for (DockerStatus dockerStatus : dockerStatuses) {
-                                            String serverType = dockerStatus.getServerType()
-                                            if (serverType != "cloud_win") {
+
+                                List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatusesByIp(ip)
+                                if (dockerStatuses != null && !dockerStatuses.isEmpty()) {
+                                    for (DockerStatus dockerStatus : dockerStatuses) {
+                                        String serverType = dockerStatus.getServerType()
+                                        if (serverType != "cloud_win") {
+                                            if (contentStr == "") {
+                                                contentStr += "\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.project.path") + serverType + "/lib"
+                                            } else {
+                                                contentStr += "\n\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.project.path") + serverType + "/lib"
+                                            }
+                                            if (redeployJars.contains(file.getOriginalFilename())) {
                                                 contentStr += "\n\\cp " + groovyCloudProp.getProperty("groovycloud.server.project.path") + tempDir + "/" + file.getOriginalFilename() + " " + groovyCloudProp.getProperty("groovycloud.server.project.path") + serverType
                                             }
                                         }
@@ -321,6 +322,7 @@ public class AuthorizeController {
             jarFiles.clear()
         }
     }
+
     @GetMapping("downzips")
     def downloadAllGroovy(HttpServletResponse response) {
         File directory = new File(System.getProperty("user.dir") + File.separator + "scripts");
@@ -348,14 +350,15 @@ public class AuthorizeController {
         FileUtils.deleteQuietly(new File(zipFilePath))
         FileUtils.deleteQuietly(directory)
     }
+
     @GetMapping("downzips/{input}")
     def downloadGroovyByInput(HttpServletResponse response, @PathVariable List input) {
         List allServiceVersion = getNeedDownServiceVersion(input)
-        if(allServiceVersion != null){
+        if (allServiceVersion != null) {
             File directory = new File(System.getProperty("user.dir") + File.separator + "scripts");
             List<FileAdapter.FileEntity> files = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx("/"), null, true);
             for (FileAdapter.FileEntity entity : files) {
-                if(allServiceVersion.contains(entity.getAbsolutePath().split("/")[2])){
+                if (allServiceVersion.contains(entity.getAbsolutePath().split("/")[2])) {
                     FileAdapter.PathEx path = new FileAdapter.PathEx(entity.getAbsolutePath());
                     FileOutputStream outputStream = FileUtils.openOutputStream(new File(directory.getAbsolutePath() + entity.getAbsolutePath()))
                     try {
@@ -478,7 +481,7 @@ public class AuthorizeController {
                     serviceVersionList = new ArrayList()
                     serviceVersionMap.put(service, serviceVersionList)
                 }
-                if(!serviceVersionList.contains(version)){
+                if (!serviceVersionList.contains(version)) {
                     serviceVersionList.add(version)
                 }
             }
@@ -517,7 +520,8 @@ public class AuthorizeController {
         }
         return serverTypeMap
     }
-    private getNeedDownServiceVersion(List configsinput){
+
+    private getNeedDownServiceVersion(List configsinput) {
         List allServiceVersion = new ArrayList()
         Map serverTypeMap = getServiceVresions()
         Map configServiceVersionMap = getConfigServiceVersions()
@@ -575,7 +579,7 @@ public class AuthorizeController {
                             allServiceVersion.add(serviceVersion)
                         }
                     } else if (versionType.equals("allVersion")) {
-                        for (String version : theVersionList){
+                        for (String version : theVersionList) {
                             String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
                             if (!allServiceVersion.contains(serviceVersion)) {
                                 allServiceVersion.add(serviceVersion)
@@ -591,10 +595,11 @@ public class AuthorizeController {
         }
         return allServiceVersion
     }
+
     @GetMapping("downconfigs/{configsinput}")
     def downloadConfigs(HttpServletResponse response, @PathVariable List configsinput) {
         List allServiceVersion = getNeedDownServiceVersion(configsinput)
-        if(allServiceVersion != null){
+        if (allServiceVersion != null) {
             List<Document> configs = serversService.getServerConfigs()
             File file = new File(System.getProperty("user.dir") + File.separator + "serverconfigs" + File.separator + "configsinput");
             FileOutputStream outputStream = FileUtils.openOutputStream(file)
