@@ -52,6 +52,11 @@ export default {
             path: `${pre}serverLogs`,
             title: 'Server Logs ',
             icon: 'commenting'
+        },
+        {
+            path: `${pre}transactions`,
+            title: `Transactions`,
+            icon: 'commenting'
         }
     ])("/hulk/")
 }

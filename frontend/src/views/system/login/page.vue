@@ -37,7 +37,8 @@
                   <el-input
                     type="text"
                     v-model="formLogin.username"
-                    :placeholder="$t('views.system.login.form.placeholder.username')">
+                    :placeholder="$t('views.system.login.form.placeholder.username')"
+                    @change="submit">
                     <i slot="prepend" class="fa fa-user-circle-o"></i>
                   </el-input>
                 </el-form-item>
@@ -45,7 +46,8 @@
                   <el-input
                     type="password"
                     v-model="formLogin.password"
-                    :placeholder="$t('views.system.login.form.placeholder.password')">
+                    :placeholder="$t('views.system.login.form.placeholder.password')"
+                    @change="submit">
                     <i slot="prepend" class="fa fa-keyboard-o"></i>
                   </el-input>
                 </el-form-item>
@@ -147,6 +149,9 @@ export default {
       }
     }
   },
+  created() {
+    this.keyupSubmit()
+  },
   computed: {
     // 校验
     rules () {
@@ -193,6 +198,14 @@ export default {
     ...mapActions('d2admin/account', [
       'login'
     ]),
+    keyupSubmit(){
+      document.onkeydown=e=>{
+        let _key=window.event.keyCode;
+        if(_key===13){
+          this.submit()
+        }
+      }
+    },
     refreshTime () {
       this.time = dayjs().format('HH:mm:ss')
     },

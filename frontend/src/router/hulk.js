@@ -71,6 +71,12 @@ export default {
             name: `${pre}/serverLogs`,
             component: _import('hulk/serverLogs/index'),
             meta: {...meta, title: `Server Logs`}
+        },
+        {
+            path: `transactions`,
+            name: `${pre}/transactions`,
+            component: _import('hulk/transactions/index'),
+            meta: {...meta, title: `Transactions`}
         }
     ])('hulk-admin-')
 }
