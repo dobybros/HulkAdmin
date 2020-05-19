@@ -38,16 +38,7 @@ class RepairTaskController {
             String url = repairData.getServerUri() + "/base/repair/" + id
             Map header = new HashMap()
             header.put("key", CommonStants.internalKey)
-            Result result = ScriptHttpUtils.post(null, url, header, Result.class)
-            if (result != null && result.success()) {
-                repairData.setExecuteResult(result.getData() == null ? "null" : result.getData())
-            } else {
-                if(result != null){
-                    repairData.setExecuteResult(result.toString())
-                }
-            }
-            repairData.setLastExecuteTime(TimeUtils.getDateString(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss"))
-            repairService.updateRepairData(repairData)
+            ScriptHttpUtils.post(null, url, header, Result.class)
         } else {
             throw new GeneralException(5000, "id's repairData can find")
         }
