@@ -77,6 +77,13 @@ export default {
             name: `${pre}/transactions`,
             component: _import('hulk/transactions/index'),
             meta: {...meta, title: `Transactions`}
+        },
+        {
+            path: `versions`,
+            name: `${pre}/versions`,
+            component: _import('hulk/versions/index'),
+            meta: {...meta, title: `Version Management`}
         }
+
     ])('hulk-admin-')
 }

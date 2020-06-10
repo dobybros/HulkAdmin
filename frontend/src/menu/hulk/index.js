@@ -57,6 +57,11 @@ export default {
             path: `${pre}transactions`,
             title: `Transactions`,
             icon: 'commenting'
+        },
+        {
+            path: `${pre}versions`,
+            title: `Version Management`,
+            icon: 'commenting'
         }
     ])("/hulk/")
 }
