@@ -159,7 +159,7 @@
       "reloadNginx": "Reload Nginx",
       "sure": "Sure",
       "confirmDelete": "Confirm delete ",
-      "confirmConfig":  " config?",
+      "confirmConfig": " config?",
       "server": "server",
       "web": "web",
       "nginx": "nginx",
@@ -314,6 +314,32 @@
             "text": "Quickly select users (test function)"
           }
         }
+      }
+    },
+    "versions": {
+      "title": {
+        "add": "Add",
+        "create": "Create app",
+        "name": "App name",
+        "appId": "App id",
+        "minBuild": "Minimum build",
+        "actions": "Actions",
+        "editApp": "Edit",
+        "addBuild": "Add build",
+        "appNumber": "App number",
+        "project": "Project",
+        "deviceType": "Device type",
+        "deviceReg": "Device UA regex",
+        "buildNumber": "Build number",
+        "removeBuild": "Remove build",
+        "type": "Type",
+        "infos": "Infos",
+        "releaseNotes": "Release Notes",
+        "inputReleaseNotes": "Type release notes, enter to add new line",
+        "builds": "Builds",
+        "version": "Version",
+        "done": "Done",
+        "cancel": "Cancel"
       }
     }
   }
