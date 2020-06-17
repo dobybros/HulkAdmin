@@ -31,28 +31,22 @@ export default {
             meta: {...meta, title: `Deploy Upload Groovy`}
         },
         {
-            path: `deployserviceversion`,
-            name: `${pre}/deployserviceversion`,
+            path: `deployreloadcontainer`,
+            name: `${pre}/deployreloadcontainer`,
             component: _import('hulk/deployserviceversion/index'),
-            meta: {...meta, title: `Deploy Service Version`}
+            meta: {...meta, title: `Deploy Reload Container`}
+        },
+        {
+            path: `deployrecord`,
+            name: `${pre}/deployrecord`,
+            component: _import('hulk/deployrecord/index'),
+            meta: {...meta, title: `Deploy Records`}
         },
         {
             path: `deployuploadweb`,
             name: `${pre}/deployuploadweb`,
             component: _import('hulk/deployuploadweb/index'),
             meta: {...meta, title: `Deploy Upload Web`}
-        },
-        {
-            path: `deployreloadcontainer`,
-            name: `${pre}/deployreloadcontainer`,
-            component: _import('hulk/deployreloadcontainer/index'),
-            meta: {...meta, title: `Deploy Reload Container`}
-        },
-        {
-            path: `deployreloadnginx`,
-            name: `${pre}/deployreloadnginx`,
-            component: _import('hulk/deployreloadnginx/index'),
-            meta: {...meta, title: `Deploy Reload Nginx`}
         },
         {
             path: `gcMemory`,

@@ -19,35 +19,6 @@
                 </el-col>
             </el-row>
             <el-scrollbar style="height: 700px" v-loading="loading">
-                <el-row :style="display">
-                    <el-col :span="15">
-                        <div class="grid-content bg-purple-dark font-style" style="">{{$t("views.deploy.server")}}</div>
-                    </el-col>
-                </el-row>
-                <el-row :style="display">
-                    <el-col :span="12">
-                        <span class="font-style">{{$t("views.deploy.serviceName")}}</span>
-                    </el-col>
-                    <el-col :span="8">
-                        <span class="font-style">{{$t("views.deploy.version")}}</span>
-                    </el-col>
-                </el-row>
-                <el-row v-for="server in this.servers" :style="display">
-                    <el-col :span="12">
-                        <el-input v-model="server.serviceName" clearable placeholder="Input service name"></el-input>
-                    </el-col>
-                    <el-col :span="8">
-                        <el-select v-model="server.currentVersion" @click.native="getServerVersions(server.serviceName)"
-                                   placeholder="Select version">
-                            <el-option
-                                    v-for="version in server.versions"
-                                    :key="version"
-                                    :label="version"
-                                    :value="version">
-                            </el-option>
-                        </el-select>
-                    </el-col>
-                </el-row>
                 <el-row style="margin: 15px 0;">
                     <el-col :style="display">
                         <el-button type="primary" icon="el-icon-plus" round @click="addServer"></el-button>
@@ -221,8 +192,8 @@
                         this.loading = false
                         this.display = "display: block"
                         this.$message.success("Loaded!")
-                        this.servers = resp["servers"]
-                        this.webs = resp["webs"]
+                        // this.servers = resp["servers"]
+                        this.webs = resp
                         this.nginx = resp["nginx"]
                     })
                     .catch(err => {

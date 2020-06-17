@@ -19,23 +19,18 @@ export default {
             icon: 'commenting'
         },
         {
-            path: `${pre}deployserviceversion`,
-            title: 'Deploy ServiceVersion ',
-            icon: 'commenting'
-        },
-        {
-            path: `${pre}deployuploadweb`,
-            title: 'Deploy Upload Web ',
-            icon: 'commenting'
-        },
-        {
             path: `${pre}deployreloadcontainer`,
             title: 'Deploy Reload Server ',
             icon: 'commenting'
         },
         {
-            path: `${pre}deployreloadnginx`,
-            title: 'Deploy Reload Nginx ',
+            path: `${pre}deployrecord`,
+            title: 'Deploy Records ',
+            icon: 'commenting'
+        },
+        {
+            path: `${pre}deployuploadweb`,
+            title: 'Deploy Upload Web ',
             icon: 'commenting'
         },
         {

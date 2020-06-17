@@ -339,7 +339,7 @@
                         this.uploadUrlData = ''
                         this.serviceName = ''
                         this.fileList = []
-                        // location.reload()
+                        location.reload()
                     } else {
                         this.$message.error('Please select a file to upload!');
                     }

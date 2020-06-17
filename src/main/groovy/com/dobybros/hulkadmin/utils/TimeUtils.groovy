@@ -17,6 +17,15 @@ class TimeUtils {
         }
         return null
     }
+    public static String getDateString(String anyTime, String pattern) {
+        if (anyTime != null) {
+            SimpleDateFormat format = new SimpleDateFormat(pattern);
+            format.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+            Long time = format.parse(anyTime).getTime()
+            return getDateString(time, "yyyy-MM-dd HH:mm:ss,SSS")
+        }
+        return null
+    }
     public static getDateLong(String dateTime, String pattern){
         if(dateTime != null){
             SimpleDateFormat format = new SimpleDateFormat(pattern);

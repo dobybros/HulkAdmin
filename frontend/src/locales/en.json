@@ -153,6 +153,8 @@
       "selectFile": "Select file",
       "upload": "Upload",
       "newServiceVersion": "New Service Version",
+      "repairServiceVersion": "Repair Service Version",
+      "repairBaseJar": "Repair BaseJar",
       "reload": "Reload",
       "reloadNginx": "Reload Nginx",
       "sure": "Sure",
@@ -178,10 +180,16 @@
       "ImportConfig": "Import Config",
       "uploadGroovys": "Upload Groovys",
       "loadWebs": "Load",
-      "AddBaseJars": "Add the underlying jars",
+        "AddBaseJars": "Add the underlying jars",
       "repairConfig": "repair config",
       "repair": "Repair",
-      "search": "Search"
+      "search": "Search",
+      "serviceVersion": "serviceVersion",
+      "baseJars": "baseJars",
+      "seeServices": "see Services",
+      "seeJars": "see Jars",
+      "serversStatus": "servers status",
+      "setWebVersion": "set web versions"
     },
     "system": {
       "error": {

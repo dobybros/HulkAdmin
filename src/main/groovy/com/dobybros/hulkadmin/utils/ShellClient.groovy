@@ -1,5 +1,7 @@
 package com.dobybros.hulkadmin.utils
 
+import com.alibaba.fastjson.JSON
+import com.dobybros.hulkadmin.general.Logger
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
@@ -9,16 +11,19 @@ import com.jcraft.jsch.Session
  * Description：
  */
 class ShellClient {
+    private final String TAG = ShellClient.class.getSimpleName()
     private String host
     private String userName
     private String password
     private int port
+
     ShellClient(String host, String userName, String password, int port) throws Exception {
-       this.host = host
+        this.host = host
         this.userName = userName
         this.password = password
         this.port = port
     }
+
     private Session createSession(JSch jsch, String host, String username, int port) throws Exception {
         Session session = null;
         if (port <= 0) {
@@ -36,7 +41,8 @@ class ShellClient {
         session.setConfig("StrictHostKeyChecking", "no");
         return session;
     }
-    public def excuteCommand(String command){
+
+    public def excuteCommand(String command) {
         List list = new ArrayList()
         String execCmd = command
         def returnCode = 0
@@ -46,11 +52,46 @@ class ShellClient {
         session.setPassword(password)
         session.connect(20000)
 
-        ChannelExec channel = (ChannelExec)session.openChannel("exec")
+        ChannelExec channel = (ChannelExec) session.openChannel("exec")
         channel.setCommand(execCmd)
-        channel.setInputStream(null)
-        BufferedReader input = new BufferedReader(new InputStreamReader(channel.getInputStream()))
+//        channel.setInputStream(null)
         channel.connect()
+        BufferedReader input = new BufferedReader(new InputStreamReader(channel.getErrStream()))
+
+        String line
+        while ((line = input.readLine())) {
+            list.add(line)
+        }
+        try {
+            input.close()
+        } catch (Throwable e) {
+            e.printStackTrace()
+        }
+
+        if (channel.isClosed()) {
+            returnCode = channel.getExitStatus()
+        }
+        channel.disconnect()
+        session.disconnect()
+        Logger.info(TAG, "Finish execute ${command}, msg: ${JSON.toJSONString(list)}")
+        return list
+    }
+
+    public def excuteCommandReturnLs(String command) {
+        List list = new ArrayList()
+        String execCmd = command
+        def returnCode = 0
+        JSch jsch = new JSch()
+
+        Session session = createSession(jsch, host, userName, port)
+        session.setPassword(password)
+        session.connect(20000)
+
+        ChannelExec channel = (ChannelExec) session.openChannel("exec")
+        channel.setCommand(execCmd)
+//        channel.setInputStream(null)
+        channel.connect()
+        BufferedReader input = new BufferedReader(new InputStreamReader(channel.getInputStream()))
 
         String line
         while ((line = input.readLine())) {
@@ -68,5 +109,11 @@ class ShellClient {
         channel.disconnect()
         session.disconnect()
         return list
+    }
+
+    public static void main(String[] args) {
+        ShellClient shellClient = new ShellClient("192.168.80.119", "root", "acl123", 22);
+        List list = shellClient.excuteCommand("sudo docker exec nginx nginx -tc /etc/nginx/nginx.conf")
+        println list
     }
 }

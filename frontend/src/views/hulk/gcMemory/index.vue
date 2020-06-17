@@ -39,7 +39,15 @@
             </el-table>
         </el-container>
         <el-container style="height: 700px;max-width: 1600px ;overflow-y: scroll;overflow-x: scroll;">
-            <pre style="font-family: Courier">{{memoryData}}</pre>
+            <el-row>
+                <el-button @click="refreshMemory">
+                    <i class="el-icon-refresh"></i>
+                </el-button>
+            </el-row>
+            <el-row style="margin-top: 5px">
+                <pre style="font-family: Courier">{{memoryData}}</pre>
+            </el-row>
+
         </el-container>
     </div>
 </template>
@@ -65,7 +73,7 @@
                         if (resp.tableList !== undefined) {
                             this.tableData = resp.tableList
                             this.showGws = true
-                        }else {
+                        } else {
                             this.tableData = []
                             this.showGws = false
                         }
@@ -74,15 +82,25 @@
                         this.$message.error(err);
                     })
             },
-            deleteUser(userId){
+            refreshMemory(){
+                GetGroovyCloudData(this.value)
+                    .then(resp => {
+                        this.$message.success("Updated!")
+                        this.memoryData = resp.data
+                    })
+                    .catch(err => {
+                        this.$message.error(err);
+                    })
+            },
+            deleteUser(userId) {
                 DeleteGwsUser(this.value, userId.userId)
                     .then(resp => {
-                        this.$message.success("Delete onlineUser  "+ userId.userId + "  success!")
+                        this.$message.success("Delete onlineUser  " + userId.userId + "  success!")
                         this.memoryData = resp.data
                         if (resp.tableList !== undefined) {
                             this.tableData = resp.tableList
                             this.showGws = true
-                        }else {
+                        } else {
                             this.tableData = []
                             this.showGws = false
                         }

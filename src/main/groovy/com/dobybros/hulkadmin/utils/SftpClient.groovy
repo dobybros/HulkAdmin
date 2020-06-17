@@ -1,6 +1,7 @@
 package com.dobybros.hulkadmin.utils
 
 import chat.logs.LoggerEx
+import com.dobybros.hulkadmin.general.Logger
 import com.jcraft.jsch.Channel
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.ChannelSftp
@@ -17,6 +18,7 @@ class SftpClient {
     ChannelSftp sftp = null;
     Session session = null
     public static final String SFTP_PROTOCAL = "sftp";
+    private final String TAG = SftpClient.class.getSimpleName()
 
     SftpClient(String host, String username, String password, int port) throws Exception {
         Channel channel = null;
@@ -63,26 +65,43 @@ class SftpClient {
             sftp.get(srcfile, new FileOutputStream(file));
         } catch (Exception e) {
             e.printStackTrace()
+            Logger.error(TAG, "download err, srcPath: ${srcPath} errMsg: ${e.getMessage()}")
+        }finally{
+//            close()
         }
     }
     public InputStream download(String srcPath) {
         try {
-            sftp.get(srcPath);
+            return sftp.get(srcPath);
         } catch (Exception e) {
             e.printStackTrace()
+            Logger.error(TAG, "Download err, srcPath: ${srcPath} errMsg: ${e.getMessage()}")
+        }finally{
+//            close()
         }
+        return null
     }
     public void upload(String srcFile, String dest) {
         try {
             sftp.put(srcFile, dest);
         } catch (Exception e) {
             e.printStackTrace();
+            Logger.error(TAG, "Upload err, srcFile: ${srcFile} dest: ${dest} errMsg: ${e.getMessage()}")
+        }finally{
+            close()
         }
     }
 
     public void uploadByStream(String directory, String sftpFileName, InputStream inputStream) {
-        sftp.cd(directory);
-        sftp.put(inputStream, sftpFileName);
+        try {
+            sftp.cd(directory);
+            sftp.put(inputStream, sftpFileName);
+        }catch (Exception e) {
+            e.printStackTrace();
+            Logger.error(TAG, "Upload byStream err, directory: ${directory} fileName: ${sftpFileName} errMsg: ${e.getMessage()}")
+        }finally{
+            close()
+        }
     }
 
     public void close() {

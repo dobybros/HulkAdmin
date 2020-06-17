@@ -1,43 +1,41 @@
 package com.dobybros.hulkadmin.controllers
 
+import chat.errors.CoreException
 import chat.logs.LoggerEx
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
 import com.dobybros.hulkadmin.auth.LoginSevice
 import com.dobybros.hulkadmin.config.ApplicationConfig
 import com.dobybros.hulkadmin.config.NginxConfig
+import com.dobybros.hulkadmin.data.User
+import com.dobybros.hulkadmin.error.Errors
 import com.dobybros.hulkadmin.general.GeneralException
+import com.dobybros.hulkadmin.general.Logger
+import com.dobybros.hulkadmin.manager.BaseJarManager
+import com.dobybros.hulkadmin.manager.WebVersionManager
+import com.dobybros.hulkadmin.utils.CommonStants
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
 import com.docker.data.DockerStatus
 import com.docker.data.ServiceVersion
 import com.docker.file.adapters.GridFSFileHandler
+import com.docker.storage.adapters.impl.DeployServiceVersionServiceImpl
 import com.docker.storage.adapters.impl.DockerStatusServiceImpl
 import com.docker.storage.adapters.impl.ServersServiceImpl
 import com.docker.storage.adapters.impl.ServiceVersionServiceImpl
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang.StringUtils
-import org.apache.tomcat.util.ExceptionUtils
 import org.bson.Document
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.web.bind.annotation.CrossOrigin
-import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import script.file.FileAdapter
 
 import javax.servlet.http.Cookie
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
-import javax.servlet.http.HttpSession
 import java.util.concurrent.ConcurrentHashMap
 
 @RestController
@@ -59,6 +57,12 @@ public class AuthorizeController {
     ServiceVersionServiceImpl serviceVersionService
     @Autowired
     DockerStatusServiceImpl dockerStatusService
+    @Autowired
+    DeployServiceVersionServiceImpl deployServiceVersionService
+    @Autowired
+    BaseJarManager baseJarManager
+    @Autowired
+    WebVersionManager webVersionManager
     private final String GROOVYCLOUYDSERVERS1 = "groovycloud.server."
 
     private Map<String, List<MultipartFile>> jarFiles = new ConcurrentHashMap<>()
@@ -81,6 +85,24 @@ public class AuthorizeController {
         ]
     }
 
+    @PostMapping("/register")
+    def register(HttpServletResponse response, HttpServletRequest request) {
+        Object o = JSON.parse(IOUtils.toString(request.getInputStream()))
+        if(o instanceof List){
+            List list = (List)o;
+            for (Map map : list){
+                String userName = map.get("username")
+                String passwd = map.get("passwd")
+                if(StringUtils.isNotBlank(userName) && StringUtils.isNotBlank(passwd)){
+                    User user = new User()
+                    user.setAccount(map.get("username"))
+                    user.setPasswd(map.get("passwd"))
+                    LoggerEx.info(TAG, loginSevice.register(user))
+                }
+            }
+        }
+    }
+
     @PostMapping("/groovyzips")
     def uploadGroovys(@RequestParam("file") MultipartFile file) {
         if (file != null) {
@@ -101,12 +123,14 @@ public class AuthorizeController {
                             for (File theGroovyFile : groovyFiles) {
                                 uploadGroovyZip(FileUtils.openInputStream(new File(theGroovyFile.getAbsolutePath() + File.separator + "groovy.zip")), theGroovyFile.getName())
                             }
+                        } else {
+                            throw new GeneralException(Errors.ERROR_GROOVYS_NOTMATCH, "The file first level must be scripts")
                         }
                     }
                 }
             } catch (Throwable throwable) {
-                throwable.printStackTrace()
                 LoggerEx.error(TAG, "Upload groovys failed, err: " + org.apache.commons.lang.exception.ExceptionUtils.getFullStackTrace(throwable))
+                throw throwable
             } finally {
                 File parentFile = new File(parentFileStr)
                 FileUtils.deleteQuietly(parentFile)
@@ -130,7 +154,7 @@ public class AuthorizeController {
                     versionNumber = versionStrs[0].trim()
                 }
                 if (versionNumber != null) {
-                    if (versionNumber != "0") {
+                    if (!versionNumber.equals("0")) {
                         serviceNameVersion = serviceName + "_v" + versionNumber
                     } else {
                         serviceNameVersion = serviceName
@@ -138,7 +162,24 @@ public class AuthorizeController {
                 }
                 Document document = serversService.getServerConfig(serviceNameVersion)
                 if (document == null) {
-                    throw new GeneralException(5000, "Cant find config of " + serviceNameVersion + ", need configure first")
+                    Integer oldVersionNumber = Integer.valueOf(versionNumber)
+                    while (document == null && oldVersionNumber != 0) {
+                        oldVersionNumber = oldVersionNumber - 1
+                        String oldServiceNameVersion = null
+                        if (oldVersionNumber != 0) {
+                            oldServiceNameVersion = serviceName + "_v" + oldVersionNumber.toString()
+                        } else {
+                            oldServiceNameVersion = serviceName
+                        }
+                        document = serversService.getServerConfig(oldServiceNameVersion)
+                    }
+                    if (document == null) {
+                        document = new Document()
+                        document.put("_id", serviceName + "_v" + version)
+                    } else {
+                        document.put("_id", serviceNameVersion)
+                    }
+                    serversService.addServerConfig(document)
                 }
                 uploadGroovyZip(file.getInputStream(), serviceNameVersion)
             }
@@ -146,33 +187,27 @@ public class AuthorizeController {
     }
 
     private def uploadGroovyZip(InputStream inputStream, String serviceNameVersion) {
-        String thePath = applicationConfig.scriptRemotePath + serviceNameVersion + "/groovy.zip"
-        FileAdapter.PathEx path = new FileAdapter.PathEx(thePath);
-        fileAdapter.saveFile(inputStream, path, FileAdapter.FileReplaceStrategy.REPLACE);
+        try {
+            String thePath = applicationConfig.scriptRemotePath + serviceNameVersion + "/groovy.zip"
+            FileAdapter.PathEx path = new FileAdapter.PathEx(thePath);
+            fileAdapter.saveFile(inputStream, path, FileAdapter.FileReplaceStrategy.REPLACE);
+            String[] serviceNameVersions = serviceNameVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)
+            String serviceName = serviceNameVersions[0]
+            String versionNumber = serviceNameVersions[1]
+            deployServiceVersionService.updateTheServiceVersion(serviceName, versionNumber)
+        } catch (Throwable t) {
+            Logger.error(TAG, "Upload groovy failed, serviceNameVersion: ${serviceNameVersion} errMsg: ${t.getMessage()}")
+            throw new GeneralException(Errors.ERROR_GRIDFS_UPLOADFAILED, "Upload groovy failed, serviceNameVersion: ${serviceNameVersion} errMsg: ${t.getMessage()}")
+        }
     }
 
     @PostMapping("/web/{nginxName}")
     def uploadWebFile(@PathVariable String nginxName, @RequestParam("file") MultipartFile file,
                       @RequestParam(value = "w") String webName, @RequestParam(value = "p") String projectName) {
         if (!StringUtils.isEmpty(webName) && !StringUtils.is(projectName)) {
-            Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-            if (theNginxMap != null) {
-                String nginxAccount = theNginxMap.get("account")
-                String nginxPort = theNginxMap.get("port")
-                String nginxPasswd = theNginxMap.get("passwd")
-                String nginxIp = theNginxMap.get("ip")
-                String wwwPath = theNginxMap.get("webPath")
-                String projectPath = wwwPath + "/" + webName + "/" + projectName
-                String fileName = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
-                SftpClient sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                sshClient.excuteCommand("sudo mkdir -p " + projectPath)
-                sftpClient.uploadByStream(projectPath, fileName + ".zip", file.inputStream)
-                sshClient.excuteCommand("sudo unzip -d " + projectPath + "/" + fileName + " " + projectPath + "/" + fileName + ".zip")
-                sshClient.excuteCommand("sudo rm -rf " + projectPath + "/" + fileName + ".zip")
-            } else {
-                throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
-            }
+            webVersionManager.uploadWebFile(nginxName, webName, projectName, file)
+        } else {
+            throw new GeneralException(Errors.ERROR_PARAMS_ILLEGAL, "webName and projectName must not be null")
         }
     }
 
@@ -207,22 +242,22 @@ public class AuthorizeController {
 
     @PostMapping("/basejars")
     def uploadBaseJars(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "i") List<String> serverIps) {
-        if (serverIps != null && !serverIps.isEmpty()) {
-            for (String ip : serverIps) {
-                List<MultipartFile> multipartFileList = jarFiles.get(ip)
-                if (multipartFileList == null) {
-                    multipartFileList = new ArrayList<>()
-                    List multipartFileListOld = jarFiles.putIfAbsent(ip, multipartFileList)
-                    if (multipartFileListOld != null) {
-                        multipartFileList = multipartFileListOld
-                    }
-                }
-                multipartFileList.add(file)
-                IOUtils.copy(file.getInputStream(), new FileOutputStream(new File(file.getOriginalFilename())))
-            }
-        }
+            @RequestParam("file") MultipartFile file) {
+//        if (serverIps != null && !serverIps.isEmpty()) {
+//            for (String ip : serverIps) {
+//                List<MultipartFile> multipartFileList = jarFiles.get(ip)
+//                if (multipartFileList == null) {
+//                    multipartFileList = new ArrayList<>()
+//                    List multipartFileListOld = jarFiles.putIfAbsent(ip, multipartFileList)
+//                    if (multipartFileListOld != null) {
+//                        multipartFileList = multipartFileListOld
+//                    }
+//                }
+//                multipartFileList.add(file)
+//                IOUtils.copy(file.getInputStream(), new FileOutputStream(new File(file.getOriginalFilename())))
+//            }
+//        }
+        baseJarManager.uploadBaseJar(file.getInputStream(), file.getOriginalFilename())
     }
 
     @PostMapping("/allbasejars")
@@ -326,7 +361,7 @@ public class AuthorizeController {
     @GetMapping("downzips")
     def downloadAllGroovy(HttpServletResponse response) {
         File directory = new File(System.getProperty("user.dir") + File.separator + "scripts");
-        List<FileAdapter.FileEntity> files = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx("/"), null, true);
+        List<FileAdapter.FileEntity> files = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx("/scripts"), null, true);
         for (FileAdapter.FileEntity entity : files) {
             FileAdapter.PathEx path = new FileAdapter.PathEx(entity.getAbsolutePath());
             FileOutputStream outputStream = FileUtils.openOutputStream(new File(directory.getAbsolutePath() + entity.getAbsolutePath()))
@@ -356,7 +391,7 @@ public class AuthorizeController {
         List allServiceVersion = getNeedDownServiceVersion(input)
         if (allServiceVersion != null) {
             File directory = new File(System.getProperty("user.dir") + File.separator + "scripts");
-            List<FileAdapter.FileEntity> files = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx("/"), null, true);
+            List<FileAdapter.FileEntity> files = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx("/scripts"), null, true);
             for (FileAdapter.FileEntity entity : files) {
                 if (allServiceVersion.contains(entity.getAbsolutePath().split("/")[2])) {
                     FileAdapter.PathEx path = new FileAdapter.PathEx(entity.getAbsolutePath());
@@ -388,45 +423,7 @@ public class AuthorizeController {
         if (version == "undefined") {
             throw new GeneralException(5001, "Version cant be null")
         }
-        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-        if (theNginxMap != null) {
-            String nginxAccount = theNginxMap.get("account")
-            String nginxPort = theNginxMap.get("port")
-            String nginxPasswd = theNginxMap.get("passwd")
-            String nginxIp = theNginxMap.get("ip")
-            String wwwPath = theNginxMap.get("webPath")
-            String projectPath = wwwPath + "/" + webName + "/" + projectName
-            ShellClient shellClient = null
-            SftpClient sftpClient = null
-            InputStream inputStream = null
-            String projectVersionName = webName + "-" + projectName + "-" + version
-            try {
-                shellClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                shellClient.excuteCommand("sudo cp -r " + projectPath + "/" + version + " ./" + projectVersionName)
-                shellClient.excuteCommand("sudo zip -r " + projectVersionName + ".zip " + projectVersionName + "/*")
-                sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                response.setContentType("application/zip");
-                response.addHeader("Content-Disposition", "attachment;fileName=" + projectVersionName + ".zip");
-                inputStream = sftpClient.download(projectVersionName + ".zip")
-                IOUtils.copy(inputStream, response.getOutputStream())
-            } catch (Throwable throwable) {
-                LoggerEx.error(TAG, "Download web error,err: " + org.apache.commons.lang.exception.ExceptionUtils.getFullStackTrace(throwable))
-                throwable.printStackTrace()
-            } finally {
-                if (shellClient != null) {
-                    shellClient.excuteCommand("sudo rm -rf " + projectVersionName + ".zip")
-                    shellClient.excuteCommand("sudo rm -rf " + projectVersionName)
-                }
-                if (inputStream != null) {
-                    inputStream.close()
-                }
-                if (sftpClient != null) {
-                    sftpClient.close()
-                }
-            }
-        } else {
-            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
-        }
+        webVersionManager.downloadWeb(nginxName, webName, projectName, version, response)
     }
 
     @GetMapping("downconfigs")
@@ -473,7 +470,7 @@ public class AuthorizeController {
         for (Document document : configs) {
             String serviceVersion = document.get("_id")
             if (serviceVersion != null) {
-                String[] serviceVersionArray = serviceVersion.split(DeployController.SERVICE_VERSION_SYMBOL)
+                String[] serviceVersionArray = serviceVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)
                 String service = serviceVersionArray[0]
                 String version = serviceVersionArray[1]
                 List serviceVersionList = serviceVersionMap.get(service)
@@ -541,7 +538,7 @@ public class AuthorizeController {
                                     List serviceVersionList = theTypeMap.get(service)
                                     if (serviceVersionList != null) {
                                         for (String version : serviceVersionList) {
-                                            String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                                            String serviceVersion = service + CommonStants.SERVICE_VERSION_SYMBOL + version
                                             if (!allServiceVersion.contains(serviceVersion)) {
                                                 allServiceVersion.add(serviceVersion)
                                             }
@@ -551,7 +548,7 @@ public class AuthorizeController {
                                     List serviceVersionList = configServiceVersionMap.get(service)
                                     if (serviceVersionList != null) {
                                         for (String version : serviceVersionList) {
-                                            String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                                            String serviceVersion = service + CommonStants.SERVICE_VERSION_SYMBOL + version
                                             if (!allServiceVersion.contains(serviceVersion)) {
                                                 allServiceVersion.add(serviceVersion)
                                             }
@@ -574,13 +571,13 @@ public class AuthorizeController {
                     Collections.sort(theVersionList)
                     if (versionType.equals("latest version")) {
                         String version = theVersionList.get(theVersionList.size() - 1)
-                        String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                        String serviceVersion = service + CommonStants.SERVICE_VERSION_SYMBOL + version
                         if (!allServiceVersion.contains(serviceVersion)) {
                             allServiceVersion.add(serviceVersion)
                         }
                     } else if (versionType.equals("allVersion")) {
                         for (String version : theVersionList) {
-                            String serviceVersion = service + DeployController.SERVICE_VERSION_SYMBOL + version
+                            String serviceVersion = service + CommonStants.SERVICE_VERSION_SYMBOL + version
                             if (!allServiceVersion.contains(serviceVersion)) {
                                 allServiceVersion.add(serviceVersion)
                             }
@@ -650,14 +647,20 @@ public class AuthorizeController {
                 Document document = null
                 for (Map o : configs) {
                     document = new Document()
-                    if (!StringUtils.isEmpty(o.get("_id"))) {
+                    if (!StringUtils.isNotBlank(o.get("_id"))) {
                         serversService.deleteServerConfig(new Document().append("_id", o.get("_id")))
                         for (String key : o.keySet()) {
                             document.append(key.replaceAll("\\.", "_"), o.get(key).replaceAll(" ", ""))
                         }
                         if (!document.isEmpty()) {
                             serversService.addServerConfig(document)
+                            String[] serviceVersions = o.get("_id").split(CommonStants.SERVICE_VERSION_SYMBOL)
+                            String service = serviceVersions[0]
+                            String version = serviceVersions[1]
+                            deployServiceVersionService.updateTheServiceVersion(service, version)
                         }
+                    } else {
+                        throw new GeneralException(Errors.ERROR_PARAMS_ILLEGAL, "The config must contains _id")
                     }
                 }
             }

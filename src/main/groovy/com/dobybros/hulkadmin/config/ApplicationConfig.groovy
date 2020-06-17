@@ -1,18 +1,20 @@
 package com.dobybros.hulkadmin.config
 
-import groovyjarjarpicocli.CommandLine
+
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Configuration
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
-
-import java.util.concurrent.ConcurrentHashMap
-
 
 /**
  * Created by lick on 2019/6/16.
  * Description：
  */
-@Component
+@Order(0)
+@Configuration
 class ApplicationConfig {
+    @Value('${db.redis.uri}')
+    public String redisHost
     @Value('${gridfs.host}')
     public String gridfsHost
     @Value('${gridfs.files.dbname}')
@@ -45,5 +47,7 @@ class ApplicationConfig {
     public String databaseHost
     @Value('${log.kibana.url}')
     public String logKibanaUrl
+    @Value('${base.jars.path}')
+    public String basrJarsPath
 
 }
