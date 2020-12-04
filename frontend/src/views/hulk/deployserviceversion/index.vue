@@ -1,16 +1,38 @@
 <template>
     <el-container>
         <el-main>
-            <!--            <el-button type="primary" round @click="newServiceVersion">{{$t("views.deploy.newServiceVersion")}}-->
-            <!--            </el-button>-->
-<!--            <el-button type="primary" round @click="repairServiceVersion" style="margin-right: 20px">-->
-<!--                {{$t("views.deploy.repairServiceVersion")}}-->
-<!--            </el-button>-->
-<!--            <el-button type="primary" round @click="repairBaseJars" style="margin-right: 20px">-->
-<!--                {{$t("views.deploy.repairBaseJar")}}-->
-<!--            </el-button>-->
-            <el-button type="primary" round @click="sureAddbaseJars">{{$t("views.deploy.AddBaseJars")}}
-            </el-button>
+<!--            <el-row style="display: flex">-->
+<!--&lt;!&ndash;                <el-button type="primary" round @click="newServiceVersion" style="margin-right: 10px">{{$t("views.deploy.newServiceVersion")}}&ndash;&gt;-->
+<!--&lt;!&ndash;                </el-button>&ndash;&gt;-->
+
+<!--                <div style="display: flex;-->
+<!--    width: 100%;">-->
+<!--                    <el-button type="primary" round @click="sureAddbaseJars">{{$t("views.deploy.AddBaseJars")}}-->
+<!--                    </el-button>-->
+<!--                    <div style="width: calc(90% - 191px);-->
+<!--    display: flex;-->
+<!--    align-items: center;-->
+<!--    justify-content: flex-end;">-->
+<!--                        <el-input v-model="jarinput" style="width: 500px" placeholder="Input jarName"></el-input>-->
+<!--                        <a style="color: #0000cc;border-color: #000fff" target="_blank"-->
+<!--                           :href="downloadJarUrl + '/open/downjars?i=' + jarinput">-->
+<!--                            <el-button type="success">{{$t("views.deploy.downloadAllBaseJars")}}</el-button>-->
+<!--                        </a>-->
+<!--                        <el-upload-->
+<!--                                accept=".zip"-->
+<!--                                ref="upload"-->
+<!--                                :action="uploadBaseJars(1)"-->
+<!--                                :on-success="uploadJarSuccess"-->
+<!--                                :file-list="baseJarList"-->
+<!--                                :limit="1"-->
+<!--                                :auto-upload="true"-->
+<!--                                style="margin-left: 10px">-->
+<!--                            <el-button type="primary">{{$t("views.deploy.UploadBaseJars")}}<i-->
+<!--                                    class="el-icon-upload el-icon&#45;&#45;right"></i></el-button>-->
+<!--                        </el-upload>-->
+<!--                    </div>-->
+<!--                </div>-->
+<!--            </el-row>-->
             <el-table
                     :data="tableData"
                     border
@@ -31,41 +53,44 @@
                         label="Number of services"
                         width="200">
                 </el-table-column>
-                <el-table-column
-                        prop="baseJarLength"
-                        label="Number of baseJars"
-                        width="200">
-                </el-table-column>
+<!--                <el-table-column-->
+<!--                        prop="baseJarLength"-->
+<!--                        label="Number of baseJars"-->
+<!--                        width="200">-->
+<!--                </el-table-column>-->
                 <el-table-column
                         label="Operations"
                         width="400">
                     <template slot-scope="scope">
-                        <el-button type="primary" size="medium" style="margin-right: 20px"
+                        <el-button type="primary" size="medium" style="margin-right: 40px"
                                    @click="openServiceVersionDialog(scope.row)">
                             {{$t("views.deploy.serviceVersion")}}
                         </el-button>
-                        <el-button type="primary" size="medium" style="margin-right: 5px"
-                                   @click="openBaseJarsDialog(scope.row)">
-                            {{$t("views.deploy.baseJars")}}
-                        </el-button>
-<!--                        <el-button-->
-<!--                                @click.native.prevent="openDeleteServiceVersionDialog(scope.$index, scope.row)"-->
-<!--                                type="danger"-->
-<!--                                size="medium">-->
-<!--                            {{$t("views.deploy.delete")}}-->
-<!--                        </el-button>-->
-                    </template>
-                </el-table-column>
-                <el-table-column
-                        fixed="right"
-                        label="Operations"
-                        width="200">
-                    <template slot-scope="scope">
-                        <el-button type="primary" size="medium" @click="openReloadServerTypeDialog(scope.row)">
+                        <el-button type="success" size="medium" @click="openReloadServerTypeDialog(scope.row)">
                             {{$t("views.deploy.reload")}}
                         </el-button>
+<!--                        <el-button type="primary" size="medium" style="margin-right: 5px"-->
+<!--                                   @click="openBaseJarsDialog(scope.row)">-->
+<!--                            {{$t("views.deploy.baseJars")}}-->
+<!--                        </el-button>-->
+                        <!--                        <el-button-->
+                        <!--                                @click.native.prevent="openDeleteServiceVersionDialog(scope.$index, scope.row)"-->
+                        <!--                                type="danger"-->
+                        <!--                                size="medium">-->
+                        <!--                            {{$t("views.deploy.delete")}}-->
+                        <!--                        </el-button>-->
                     </template>
                 </el-table-column>
+<!--                <el-table-column-->
+<!--                        fixed="right"-->
+<!--                        label="Operations"-->
+<!--                        width="200">-->
+<!--                    <template slot-scope="scope">-->
+<!--                        <el-button type="primary" size="medium" @click="openReloadServerTypeDialog(scope.row)">-->
+<!--                            {{$t("views.deploy.reload")}}-->
+<!--                        </el-button>-->
+<!--                    </template>-->
+<!--                </el-table-column>-->
             </el-table>
         </el-main>
         <el-dialog width="60%" :visible.sync="serviceVersionDialogVisible" :title="this.remindServerTypeService">
@@ -103,35 +128,35 @@
                 </el-table-column>
             </el-table>
         </el-dialog>
-        <el-dialog width="60%" :visible.sync="baseJarsVisible" :title="this.remindBaseJars">
-            <el-table
-                    :data="basePro.baseJarVersions"
-                    border
-                    height="600px">
-                <el-table-column
-                        prop="jarName"
-                        label="jarName">
-                </el-table-column>
-                <el-table-column
-                        prop="version"
-                        label="version">
-                </el-table-column>
-            </el-table>
-            <el-divider></el-divider>
-            <el-table
-                    :data="basePro.servers"
-                    border
-                    height="200px">
-                <el-table-column
-                        prop="ip"
-                        label="ip">
-                </el-table-column>
-                <el-table-column
-                        prop="dockerNames"
-                        label="dockerNames">
-                </el-table-column>
-            </el-table>
-        </el-dialog>
+<!--        <el-dialog width="60%" :visible.sync="baseJarsVisible" :title="this.remindBaseJars">-->
+<!--            <el-table-->
+<!--                    :data="basePro.baseJarVersions"-->
+<!--                    border-->
+<!--                    height="600px">-->
+<!--                <el-table-column-->
+<!--                        prop="jarName"-->
+<!--                        label="jarName">-->
+<!--                </el-table-column>-->
+<!--                <el-table-column-->
+<!--                        prop="version"-->
+<!--                        label="version">-->
+<!--                </el-table-column>-->
+<!--            </el-table>-->
+<!--            <el-divider></el-divider>-->
+<!--            <el-table-->
+<!--                    :data="basePro.servers"-->
+<!--                    border-->
+<!--                    height="200px">-->
+<!--                <el-table-column-->
+<!--                        prop="ip"-->
+<!--                        label="ip">-->
+<!--                </el-table-column>-->
+<!--                <el-table-column-->
+<!--                        prop="dockerNames"-->
+<!--                        label="dockerNames">-->
+<!--                </el-table-column>-->
+<!--            </el-table>-->
+<!--        </el-dialog>-->
 
         <el-dialog
                 :title="$t('views.deploy.reminder')"
@@ -208,6 +233,17 @@
                     .catch(err => {
                         this.$message.error(err);
                     })
+            },
+            uploadBaseJars() {
+                return this.downloadJarUrl + "/open/basejarszip"
+            },
+            uploadJarSuccess(res, file, fileList) {
+                if (res.code === 1) {
+                    this.$message.success("File " + file.name + " Upload Success!")
+                } else {
+                    this.$message.error("File " + file.name + "Upload Failed! errMsg: " + res.message)
+                }
+                this.baseJarList = []
             },
             openReloadServerTypeDialog(data) {
                 this.remindReloadServerType = "Confirm reload container " + data.serverType + "?"
@@ -366,7 +402,10 @@
                 remindReloadServerType: "",
                 addbaseJars: false,
                 fileList: [],
-                uploadUrl: '/open/basejars'
+                uploadUrl: '/open/basejars',
+                downloadJarUrl: '',
+                jarinput: '',
+                baseJarList: []
             }
         },
         created() {
@@ -374,6 +413,13 @@
                 .then(resp => {
                     this.$message.success("Updated!")
                     this.tableData = resp
+                    let uploadHost = ''
+                    if (process.env.VUE_APP_API === "/" || process.env.VUE_APP_API === '' || process.env.VUE_APP_API === undefined) {
+                        uploadHost = location.protocol + "//" + location.host
+                    } else {
+                        uploadHost = process.env.VUE_APP_API
+                    }
+                    this.downloadJarUrl = uploadHost
                 })
                 .catch(err => {
                     this.$message.error(err);

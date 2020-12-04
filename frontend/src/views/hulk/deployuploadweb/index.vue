@@ -114,6 +114,11 @@
                 width="60%">
             <el-scrollbar style="height: 700px" v-loading="loading">
                 <el-row>
+                    <el-button @click="refreshWebVersion">
+                        <i class="el-icon-refresh"></i>
+                    </el-button>
+                </el-row>
+                <el-row>
                     <el-col :span="20">
                         <div class="grid-content bg-purple-dark font-style" style="">{{$t("views.deploy.web")}}</div>
                     </el-col>
@@ -274,9 +279,11 @@
                 ReloadNginx({"webs": this.nginxwebs, "nginxName": this.nginxName})
                     .then(resp => {
                         this.$message.success("Success reload nginx " + this.nginxName + "!")
+                        this.dialogWebVersion = false
                     })
                     .catch(err => {
                         this.$message.error(err);
+                        this.dialogWebVersion = false
                     })
             },
             openWebDialog() {
@@ -321,6 +328,17 @@
                         }
                     })
                     .catch(err => {
+                        this.$message.error(err);
+                    })
+            },
+            refreshWebVersion(){
+                GetAllServerWebs(this.nginxName)
+                    .then(resp => {
+                        this.$message.success("Loaded!")
+                        this.nginxwebs = resp
+                    })
+                    .catch(err => {
+                        this.loading = false
                         this.$message.error(err);
                     })
             },

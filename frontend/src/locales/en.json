@@ -174,7 +174,7 @@
       "add": "Add",
       "download": "Download",
       "downloadAllGroovy": "Download All Groovy",
-      "downloadGroovys": "downloadGroovys",
+      "downloadGroovys": "Download Groovys",
       "ExportAllConfig": "Export All Config",
       "ExportConfig": "Export config",
       "ImportConfig": "Import Config",
@@ -189,7 +189,9 @@
       "seeServices": "see Services",
       "seeJars": "see Jars",
       "serversStatus": "servers status",
-      "setWebVersion": "set web versions"
+      "setWebVersion": "set web versions",
+      "downloadAllBaseJars": "Download Jars by zip",
+      "UploadBaseJars": "Upload Jars by zip"
     },
     "system": {
       "error": {

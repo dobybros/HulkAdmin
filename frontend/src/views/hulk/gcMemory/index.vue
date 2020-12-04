@@ -7,6 +7,11 @@
                              :options="options"
                              @change="handleChange"></el-cascader>
             </div>
+            <div style="margin-bottom: 10px">
+                <el-button @click="refreshMemory">
+                    <i class="el-icon-refresh"></i>
+                </el-button>
+            </div>
         </el-container>
         <el-container v-show="showGws" style="width: 80%">
             <el-table
@@ -38,12 +43,8 @@
                 </el-table-column>
             </el-table>
         </el-container>
-        <el-container style="height: 700px;max-width: 1600px ;overflow-y: scroll;overflow-x: scroll;">
-            <el-row>
-                <el-button @click="refreshMemory">
-                    <i class="el-icon-refresh"></i>
-                </el-button>
-            </el-row>
+        <el-container style="height: 700px;max-width: 1600px ;overflow-y: scroll;overflow-x: scroll; display: flex; flex-direction: column;">
+
             <el-row style="margin-top: 5px">
                 <pre style="font-family: Courier">{{memoryData}}</pre>
             </el-row>

@@ -96,19 +96,18 @@ class NginxManager {
         return null
     }
 
-    public String reloadNginx(String nginxName, String nginxTag) {
+    public List reloadNginx(String nginxName, String nginxTag) {
         try {
             Nginx nginx = getNginx(nginxName)
             String nginxBak = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
             remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo mv " + nginx.getNginxPath() + nginxFileName + " " + nginx.getNginxPath() + nginxFileName + "_" + nginxBak)
             remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo mv " + nginx.getNginxPath() + nginxFileName + "_" + nginxTag + " " + nginx.getNginxPath() + nginxFileName)
-            remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo docker exec nginx nginx -s reload")
-            Logger.info(TAG, "Reload nginx ${nginxName} success")
+            return remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo docker exec nginx nginx -s reload")
+//            Logger.info(TAG, "Reload nginx ${nginxName} success")
         } catch (Throwable t) {
             Logger.error(TAG, "Reload nginx err, errMsg: ${t.getMessage()}")
-            return t.getMessage()
+            return [t.getMessage()]
         }
-        return null
     }
 
     public List testNginx(String nginxName, String nginxTag) {

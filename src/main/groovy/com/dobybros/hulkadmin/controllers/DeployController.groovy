@@ -74,8 +74,6 @@ class DeployController {
     @Autowired
     DockerStatusServiceImpl dockerStatusService
     @Autowired
-    ServiceVersionServiceImpl serviceVersionService
-    @Autowired
     DeployServiceVersionServiceImpl deployServiceVersionService
     @Autowired
     RedisManager redisManager
@@ -116,46 +114,6 @@ class DeployController {
                 }
             }
         }
-    }
-
-    @GetMapping("repairdeployserviceversion")
-    def repairDeployServiceVersion() {
-        List<ServiceVersion> serviceversions = serviceVersionService.getServiceVersionsAll()
-        if (serviceVersions != null && !serviceVersions.isEmpty()) {
-            for (ServiceVersion serviceVersion : serviceversions) {
-                try {
-                    ServerType serverTypeData = serverTypeManager.getServerType(serviceVersion.getServerType()[0])
-                    if (serverTypeData != null) {
-                        DeployServiceVersion deployServiceVersion = new DeployServiceVersion()
-                        deployServiceVersion.set_id(serviceVersion.get_id())
-                        deployServiceVersion.setType(serviceVersion.getType())
-                        deployServiceVersion.setServerType(serviceVersion.getServerType()[0])
-                        deployServiceVersion.setServiceVersions(serviceVersion.getServiceVersions())
-                        deployServiceVersion.setGroovyCloudType(serverTypeData.getGroovyCloudType().toString())
-                        deployServiceVersionService.addServiceVersion(deployServiceVersion)
-                    } else {
-                        Logger.error(TAG, "Method: repairDeployServiceVersion, repair ${serviceVersion.getServerType()[0]} failed, cant find in serverTypeManager")
-                    }
-                } catch (Throwable t) {
-                    Logger.error(TAG, "Repair deployserviceversion err, errMSg: ${ExceptionUtils.getFullStackTrace(t)}")
-                }
-            }
-        }
-        Set allServerType = serverTypeManager.getAllServerType()
-        if (allServerType != null && !allServerType.isEmpty()) {
-            for (String serverType : allServerType) {
-                if (deployServiceVersionService.getServiceVersion(serverType) == null) {
-                    ServerType serverTypeData = serverTypeManager.getServerType(serverType)
-                    DeployServiceVersion deployServiceVersion = new DeployServiceVersion()
-                    deployServiceVersion.setServerType(serverType)
-                    deployServiceVersion.setGroovyCloudType(serverTypeData.getGroovyCloudType().toString())
-                    deployServiceVersion.set_id(ObjectId.get().toString())
-                    deployServiceVersion.setType(DeployServiceVersion.TYPE_DEFAULT)
-                    deployServiceVersionService.addServiceVersion(deployServiceVersion)
-                }
-            }
-        }
-        return getAllDeployServiceVersions()
     }
 
     @GetMapping("repairbaseJars")
@@ -286,32 +244,30 @@ class DeployController {
     }
 
     private Map getServiceVersions() {
-        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
+        List<DeployServiceVersion> serviceVersions = deployServiceVersionService.getServiceVersionsAll()
         Map serviceVersionMap = new HashMap()
         serviceVersionMap.put("value", "serverType")
         serviceVersionMap.put("label", "serverType")
         Map serverTypeMap = new HashMap()
-        for (ServiceVersion serviceVersion : serviceVersions) {
-            List serverTypes = serviceVersion.getServerType()
-            for (String serverType : serverTypes) {
-                Map theServerTypeMap = serverTypeMap.get(serverType)
-                if (theServerTypeMap == null) {
-                    theServerTypeMap = new HashMap()
-                    serverTypeMap.put(serverType, theServerTypeMap)
-                }
-                Map theTypeMap = theServerTypeMap.get(serverType)
-                if (theTypeMap == null) {
-                    theTypeMap = new HashMap()
-                    theServerTypeMap.put(serviceVersion.type, theTypeMap)
-                }
-                Map allServiceVersionMap = serviceVersion.serviceVersions
-                for (String service : allServiceVersionMap.keySet()) {
-                    String theVersion = theTypeMap.get(service)
-                    if (theVersion == null) {
-                        theTypeMap.put(service, allServiceVersionMap.get(service))
-                    } else {
-                        theTypeMap.put(service, theVersion + "," + allServiceVersionMap.get(service))
-                    }
+        for (DeployServiceVersion serviceVersion : serviceVersions) {
+            String serverType = serviceVersion.getServerType()
+            Map theServerTypeMap = serverTypeMap.get(serverType)
+            if (theServerTypeMap == null) {
+                theServerTypeMap = new HashMap()
+                serverTypeMap.put(serverType, theServerTypeMap)
+            }
+            Map theTypeMap = theServerTypeMap.get(serverType)
+            if (theTypeMap == null) {
+                theTypeMap = new HashMap()
+                theServerTypeMap.put(serviceVersion.type, theTypeMap)
+            }
+            Map allServiceVersionMap = serviceVersion.serviceVersions
+            for (String service : allServiceVersionMap.keySet()) {
+                String theVersion = theTypeMap.get(service)
+                if (theVersion == null) {
+                    theTypeMap.put(service, allServiceVersionMap.get(service))
+                } else {
+                    theTypeMap.put(service, theVersion + "," + allServiceVersionMap.get(service))
                 }
             }
         }
@@ -505,31 +461,29 @@ class DeployController {
     }
 
     private Map getServiceVresions() {
-        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
+        List<DeployServiceVersion> serviceVersions = deployServiceVersionService.getServiceVersionsAll()
         Map serverTypeMap = new HashMap()
-        for (ServiceVersion serviceVersion : serviceVersions) {
-            List serverTypes = serviceVersion.getServerType()
-            for (String serverType : serverTypes) {
-                Map theServerTypeMap = serverTypeMap.get(serverType)
-                if (theServerTypeMap == null) {
-                    theServerTypeMap = new HashMap()
-                    serverTypeMap.put(serverType, theServerTypeMap)
+        for (DeployServiceVersion serviceVersion : serviceVersions) {
+            String serverType = serviceVersion.getServerType()
+            Map theServerTypeMap = serverTypeMap.get(serverType)
+            if (theServerTypeMap == null) {
+                theServerTypeMap = new HashMap()
+                serverTypeMap.put(serverType, theServerTypeMap)
+            }
+            Map theTypeMap = theServerTypeMap.get(serverType)
+            if (theTypeMap == null) {
+                theTypeMap = new HashMap()
+                theServerTypeMap.put(serviceVersion.type, theTypeMap)
+            }
+            Map allServiceVersionMap = serviceVersion.serviceVersions
+            for (String service : allServiceVersionMap.keySet()) {
+                List theVersionList = theTypeMap.get(service)
+                if (theVersionList == null) {
+                    theVersionList = new ArrayList()
+                    theTypeMap.put(service, theVersionList)
                 }
-                Map theTypeMap = theServerTypeMap.get(serverType)
-                if (theTypeMap == null) {
-                    theTypeMap = new HashMap()
-                    theServerTypeMap.put(serviceVersion.type, theTypeMap)
-                }
-                Map allServiceVersionMap = serviceVersion.serviceVersions
-                for (String service : allServiceVersionMap.keySet()) {
-                    List theVersionList = theTypeMap.get(service)
-                    if (theVersionList == null) {
-                        theVersionList = new ArrayList()
-                        theTypeMap.put(service, theVersionList)
-                    }
-                    if (!theVersionList.contains(serviceVersion.serviceVersions.get(service))) {
-                        theVersionList.add(serviceVersion.serviceVersions.get(service))
-                    }
+                if (!theVersionList.contains(serviceVersion.serviceVersions.get(service))) {
+                    theVersionList.add(serviceVersion.serviceVersions.get(service))
                 }
             }
         }
@@ -674,7 +628,7 @@ class DeployController {
             Map map = new HashMap()
             ServerType serverTypeData = serverTypeMap.get(serverType)
             map.put("serverType", serverType)
-            map.put("groovyCloudType", serverTypeData.getGroovyCloudType())
+            map.put("groovyCloudType", ServerType.getGroovyTypeStr(serverTypeData.getGroovyCloudType()))
             DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
             if (deployServiceVersion != null) {
                 map.put("serviceLength", deployServiceVersion.getServiceVersions() == null ? 0 : deployServiceVersion.getServiceVersions().size())
@@ -725,96 +679,13 @@ class DeployController {
     }
 
     @DeleteMapping("/deployserviceversions/services/{serverType}/service/{serviceName}")
-    def deleteDeployService(@PathVariable String serverType, @PathVariable String serviceName) {
+    def delDeployService(@PathVariable String serverType, @PathVariable String serviceName) {
+        DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
+        if (deployServiceVersion == null) {
+            throw new GeneralException(Errors.ERROR_CANTFIND_DEPLOYSERVICEVERSION, "Cant find deployServiceVersion, serverType: ${serverType}")
+        }
         deployServiceVersionService.deleteService(serverType, serviceName)
         return getDeployServices(serverType)
-    }
-
-    @GetMapping("/serviceversions")
-    def getAllServiceVersions() {
-        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
-        List<Map> list = new ArrayList<>()
-        Map<String, Map<String, String>> serviceVersionsMap = null
-        Map map = null
-        for (ServiceVersion serviceVersion : serviceVersions) {
-            map = new ConcurrentHashMap()
-            List serverTypes = serviceVersion.getServerType()
-            String serverTypesStr = ""
-            for (int i = 0; i < serverTypes.size(); i++) {
-                if (i == serverTypes.size() - 1) {
-                    serverTypesStr = serverTypesStr + serverTypes.get(i)
-                } else {
-                    serverTypesStr = serverTypesStr + serverTypes.get(i) + ","
-                }
-            }
-            map.put("serverType", serverTypesStr)
-            map.put("type", serviceVersion.type)
-            map.put("_id", serviceVersion._id)
-            serviceVersionsMap = new ConcurrentHashMap<>()
-            if (serviceVersion.serviceVersions != null) {
-                Map<String, String> serviceVersionMap = null
-
-                Map keyValueMap = null
-                for (String service : serviceVersion.serviceVersions.keySet()) {
-                    keyValueMap = new HashMap()
-                    serviceVersionMap = new ConcurrentHashMap<>()
-                    if (StringUtils.isEmpty((String) serviceVersion.serviceVersions.get(service))) {
-                        keyValueMap.put("key", service)
-                        keyValueMap.put("value", "0")
-                    } else {
-                        keyValueMap.put("key", service)
-                        keyValueMap.put("value", serviceVersion.serviceVersions.get(service))
-                    }
-                    serviceVersionsMap.put(service, keyValueMap)
-                }
-                if (serviceVersionsMap.size() > 0) {
-                    map.put("serviceVersions", serviceVersionsMap)
-                    map.put("serviceLength", serviceVersionsMap.size())
-                }
-            } else {
-                map.put("serviceLength", 0)
-            }
-            list.add(map)
-        }
-        return list
-    }
-
-    @PostMapping("/serviceversion")
-    def addServiceVersion(@RequestBody Map serviceVersionMap) {
-        ServiceVersion serviceVersion = new ServiceVersion()
-        if (!StringUtils.isEmpty((String) serviceVersionMap.get("_id"))) {
-            serviceVersion._id = (String) serviceVersionMap.get("_id").replaceAll(" ", "")
-        }
-        if (!StringUtils.isEmpty((String) serviceVersionMap.get("type"))) {
-            serviceVersion.type = (String) serviceVersionMap.get("type").replaceAll(" ", "")
-        }
-        if (!StringUtils.isEmpty((String) serviceVersionMap.get("serverType"))) {
-            String serverType = (String) serviceVersionMap.get("serverType").replaceAll(" ", "")
-            List<String> serverTypes = Arrays.asList(serverType.split(","))
-            if (serverTypes != null && serverTypes.size() > 0) {
-                serviceVersion.serverType = serverTypes
-            }
-        }
-        Map serviceVersions = (Map) serviceVersionMap.get("serviceVersions")
-        Document serviceVersionFinal = new Document()
-        if (serviceVersions != null && serviceVersions.size() > 0) {
-            for (String service : serviceVersions.keySet()) {
-                Map serviceVersionMap1 = serviceVersions.get(service)
-                if (serviceVersionMap1 != null && serviceVersionMap1.size() > 0) {
-                    if (!StringUtils.isEmpty(serviceVersionMap1.get("key")) && !StringUtils.isEmpty(serviceVersionMap1.get("value"))) {
-                        if (serviceVersionMap1.get("value").equals("0")) {
-                            serviceVersionFinal.append(serviceVersionMap1.get("key").replaceAll(" ", ""), "")
-                        } else {
-                            serviceVersionFinal.append(serviceVersionMap1.get("key").replaceAll(" ", ""), serviceVersionMap1.get("value").replaceAll(" ", ""))
-                        }
-                    }
-                }
-            }
-        }
-        if (serviceVersionFinal.size() > 0) {
-            serviceVersion.serviceVersions = serviceVersionFinal
-        }
-        serviceVersionService.addServiceVersion(serviceVersion)
     }
 
     @DeleteMapping("/deployserviceversion")
@@ -914,12 +785,12 @@ class DeployController {
     def getWebVersionsByWebName(@PathVariable String nginxName, @PathVariable String webName, @PathVariable String projectName) {
         List list = webVersionManager.getWebList(nginxName)
         if (list != null) {
-            for (Map map : list){
-                if(map.get("webName").equals(webName)){
+            for (Map map : list) {
+                if (map.get("webName").equals(webName)) {
                     List projectlist = map.get("projectNames")
-                    if(projectlist != null){
-                        for (Map projectMap : projectlist){
-                            if(projectMap.get("projectName").equals(projectName)){
+                    if (projectlist != null) {
+                        for (Map projectMap : projectlist) {
+                            if (projectMap.get("projectName").equals(projectName)) {
                                 return projectMap.get("versions")
                             }
                         }
@@ -965,7 +836,7 @@ class DeployController {
                             webVersions.put(webName + "#" + projectName, currentVersion)
                         }
                     }
-                    if(!needReload){
+                    if (!needReload) {
                         return
                     }
                     String targetTime = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss") + "target"
@@ -979,9 +850,9 @@ class DeployController {
                             }
                         }
                         if (testSuccess) {
-                            result = nginxManager.reloadNginx(nginxName, targetTime)
-                            if (result != null) {
-                                throw new GeneralException(5000, "Reload nginx failed ${result}")
+                            List reloadResult = nginxManager.reloadNginx(nginxName, targetTime)
+                            if (reloadResult == null || !JSON.toJSONString(reloadResult).contains("process started")) {
+                                throw new GeneralException(5000, "Reload nginx failed ${reloadResult}")
                             }
                         } else {
                             throw new GeneralException(5000, "Test nginx failed ${testResult}")
@@ -1031,9 +902,18 @@ class DeployController {
             deployRecord.setTime(TimeUtils.getDateString(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss,SSS"))
             deployRecord.setServerType(deployServiceVersion.getServerType())
             deployRecord.setServiceVersions(deployServiceVersion.getServiceVersions())
-            Map updateBaseJarVersions = baseJarManager.getUpdateBaseJarsVersion(deployServiceVersion.getBaseJarVersions())
+            List ipDockerNames = serverManager.getIPDockerNames(serverType)
+            Map serverMap = null
+            if (ipDockerNames != null && !ipDockerNames.isEmpty()) {
+                serverMap = new HashMap()
+                for (String ipDockerName : ipDockerNames){
+                    serverMap.put(ipDockerName.replaceAll("\\.", "__"), DeployRecord.DEPLOY_SERVER_WAIT)
+                }
+            }
+            deployRecord.setDeployIngMap(serverMap)
             deployRecord.setDeployer(account)
-            deployRecord.setUpdateBaseJarVersions(updateBaseJarVersions)
+//            Map updateBaseJarVersions = baseJarManager.getUpdateBaseJarsVersion(deployServiceVersion.getBaseJarVersions())
+//            deployRecord.setUpdateBaseJarVersions(updateBaseJarVersions)
             deployRecordService.addDeployRecord(deployRecord)
             deployServiceVersionService.updateServiceVersionDeployId(deployServiceVersion.get_id(), deployRecord.getId())
             reloadManager.addDeployId(deployRecord.getServerType(), deployRecord.getId())

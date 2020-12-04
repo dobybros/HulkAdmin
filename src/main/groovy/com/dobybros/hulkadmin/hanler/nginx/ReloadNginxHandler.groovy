@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSON
 import com.dobybros.hulkadmin.config.ApplicationConfig
 import com.dobybros.hulkadmin.data.DeployRecord
 import com.dobybros.hulkadmin.data.ServerType
+import com.dobybros.hulkadmin.general.GeneralException
 import com.dobybros.hulkadmin.general.Logger
 import com.dobybros.hulkadmin.hanler.ReloadServerSuccess
 import com.dobybros.hulkadmin.manager.ReloadManager
@@ -119,10 +120,10 @@ class ReloadNginxHandler implements ReloadServerSuccess {
                                             if (!canLoad(serverType, deployServiceVersion.getDeployId())) {
                                                 return
                                             }
-                                            result = nginxManager.reloadNginx(nginxName, targetTime)
-                                            if (result != null) {
-                                                deployRecordService.upateDeployRecordServer(deployServiceVersion.getDeployId(), getNginxServer(serverType), DeployRecord.DEPLOY_SERVER_FAILED + DeployRecord.DEPLOY_SERVER_SEPEATOR + result)
-                                            } else {
+                                            List reloadResult = nginxManager.reloadNginx(nginxName, targetTime)
+                                            if (reloadResult == null || !JSON.toJSONString(reloadResult).contains("process started")) {
+                                                deployRecordService.upateDeployRecordServer(deployServiceVersion.getDeployId(), getNginxServer(serverType), DeployRecord.DEPLOY_SERVER_FAILED + DeployRecord.DEPLOY_SERVER_SEPEATOR + reloadResult)
+                                            }else {
                                                 deployRecordService.upateDeployRecordServer(deployServiceVersion.getDeployId(), getNginxServer(serverType), DeployRecord.DEPLOY_SERVER_SUCCESS)
                                                 updateServiceVersion(deployServiceVersion)
                                             }

@@ -32,7 +32,7 @@ class BaseJarManager {
                 fileAdapter.saveFile(inputStream, path, FileAdapter.FileReplaceStrategy.REPLACE);
                 Logger.info(TAG, "Upload jar ${jarName} success!!!")
             } catch (Throwable t) {
-                Logger.error(TAG, "Upload jar failed, jarName: ${jarName} errMsg: ${t.getMessage()}")
+                Logger.error(TAG,  "Upload jar failed, jarName: ${jarName} errMsg: ${t.getMessage()}")
                 throw new GeneralException(Errors.ERROR_GRIDFS_UPLOADFAILED, "Upload jar failed, jarName: ${jarName} errMsg: ${t.getMessage()}")
             }
         } else {
@@ -84,7 +84,7 @@ class BaseJarManager {
         }
         return map
     }
-    private Map getLatestBaseJarsVersion() {
+    public Map getLatestBaseJarsVersion() {
         List<FileAdapter.FileEntity> files = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx(BASEREMOTEPATHPREFIX), null, true);
         if (files != null && !files.isEmpty()) {
             Map<String, String> versionMap = new HashMap()

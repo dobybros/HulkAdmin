@@ -1,6 +1,6 @@
 package com.dobybros.hulkadmin.controllers
 
-import chat.errors.CoreException
+
 import chat.logs.LoggerEx
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
@@ -27,6 +27,7 @@ import com.docker.storage.adapters.impl.ServiceVersionServiceImpl
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang.StringUtils
+import org.apache.commons.lang.exception.ExceptionUtils
 import org.bson.Document
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.*
@@ -87,19 +88,24 @@ public class AuthorizeController {
 
     @PostMapping("/register")
     def register(HttpServletResponse response, HttpServletRequest request) {
-        Object o = JSON.parse(IOUtils.toString(request.getInputStream()))
-        if(o instanceof List){
-            List list = (List)o;
-            for (Map map : list){
-                String userName = map.get("username")
-                String passwd = map.get("passwd")
-                if(StringUtils.isNotBlank(userName) && StringUtils.isNotBlank(passwd)){
-                    User user = new User()
-                    user.setAccount(map.get("username"))
-                    user.setPasswd(map.get("passwd"))
-                    LoggerEx.info(TAG, loginSevice.register(user))
+        Logger.info(TAG, "Receive register user info")
+        try {
+            Object o = JSON.parse(IOUtils.toString(request.getInputStream()))
+            if (o instanceof List) {
+                List list = (List) o;
+                for (Map map : list) {
+                    String userName = map.get("username")
+                    String passwd = map.get("passwd")
+                    if (StringUtils.isNotBlank(userName) && StringUtils.isNotBlank(passwd)) {
+                        User user = new User()
+                        user.setAccount(map.get("username"))
+                        user.setPasswd(map.get("passwd"))
+                        LoggerEx.info(TAG, loginSevice.register(user))
+                    }
                 }
             }
+        } catch (Throwable t) {
+            Logger.error(TAG, "Register err, errMsg: ${ExceptionUtils.getFullStackTrace(t)}")
         }
     }
 
@@ -121,11 +127,64 @@ public class AuthorizeController {
                         if (unzipFiles[0].getName().equals("scripts")) {
                             File[] groovyFiles = unzipFiles[0].listFiles()
                             for (File theGroovyFile : groovyFiles) {
-                                uploadGroovyZip(FileUtils.openInputStream(new File(theGroovyFile.getAbsolutePath() + File.separator + "groovy.zip")), theGroovyFile.getName())
+                                String serviceNameVersion = theGroovyFile.getName()
+                                Document document = serversService.getServerConfig(serviceNameVersion)
+                                if (serviceNameVersion.contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
+                                    if (document == null) {
+                                        String versionNumber = serviceNameVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[1]
+                                        String serviceName = serviceNameVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[0]
+                                        Integer oldVersionNumber = Integer.valueOf(versionNumber)
+                                        while (document == null && oldVersionNumber != 0) {
+                                            oldVersionNumber = oldVersionNumber - 1
+                                            String oldServiceNameVersion = null
+                                            if (oldVersionNumber != 0) {
+                                                oldServiceNameVersion = serviceName + "_v" + oldVersionNumber.toString()
+                                            } else {
+                                                oldServiceNameVersion = serviceName
+                                            }
+                                            document = serversService.getServerConfig(oldServiceNameVersion)
+                                        }
+                                        if (document == null) {
+                                            document = new Document()
+                                        }
+                                        document.put("_id", serviceNameVersion)
+                                        serversService.addServerConfig(document)
+                                    }
+                                    uploadGroovyZip(FileUtils.openInputStream(new File(theGroovyFile.getAbsolutePath() + File.separator + "groovy.zip")), theGroovyFile.getName())
+                                }
                             }
                         } else {
                             throw new GeneralException(Errors.ERROR_GROOVYS_NOTMATCH, "The file first level must be scripts")
                         }
+                    }
+                }
+            } catch (Throwable throwable) {
+                LoggerEx.error(TAG, "Upload groovys failed, err: " + org.apache.commons.lang.exception.ExceptionUtils.getFullStackTrace(throwable))
+                throw throwable
+            } finally {
+                File parentFile = new File(parentFileStr)
+                FileUtils.deleteQuietly(parentFile)
+            }
+
+        }
+    }
+
+    @PostMapping("/basejarszip")
+    def uploadBaseJarsByZip(@RequestParam("file") MultipartFile file) {
+        if (file != null) {
+            String parentFileStr = System.getProperty("user.dir") + File.separator + "basejarsUpload"
+            try {
+                File groovyFile = new File(parentFileStr + File.separator + "example")
+                if (!groovyFile.exists()) {
+                    groovyFile.mkdirs()
+                }
+                file.transferTo(groovyFile)
+                com.dobybros.hulkadmin.utils.FileUtils.unZip(groovyFile, parentFileStr + File.separator + "unzip")
+                File unzipFile = new File(parentFileStr + File.separator + "unzip")
+                if (unzipFile.exists()) {
+                    File[] unzipFiles = unzipFile.listFiles()
+                    for (File jarFile : unzipFiles) {
+                        baseJarManager.uploadBaseJar(new FileInputStream(jarFile), jarFile.getName())
                     }
                 }
             } catch (Throwable throwable) {
@@ -175,10 +234,8 @@ public class AuthorizeController {
                     }
                     if (document == null) {
                         document = new Document()
-                        document.put("_id", serviceName + "_v" + version)
-                    } else {
-                        document.put("_id", serviceNameVersion)
                     }
+                    document.put("_id", serviceNameVersion)
                     serversService.addServerConfig(document)
                 }
                 uploadGroovyZip(file.getInputStream(), serviceNameVersion)
@@ -198,6 +255,8 @@ public class AuthorizeController {
         } catch (Throwable t) {
             Logger.error(TAG, "Upload groovy failed, serviceNameVersion: ${serviceNameVersion} errMsg: ${t.getMessage()}")
             throw new GeneralException(Errors.ERROR_GRIDFS_UPLOADFAILED, "Upload groovy failed, serviceNameVersion: ${serviceNameVersion} errMsg: ${t.getMessage()}")
+        } finally {
+            inputStream.close()
         }
     }
 
@@ -384,6 +443,51 @@ public class AuthorizeController {
         }
         FileUtils.deleteQuietly(new File(zipFilePath))
         FileUtils.deleteQuietly(directory)
+    }
+
+    @GetMapping("downjars")
+    def downloadJars(HttpServletResponse response, @RequestParam("i") String input) {
+        Map baseJarsVersion = baseJarManager.getLatestBaseJarsVersion()
+        if (baseJarsVersion != null && !baseJarsVersion.isEmpty()) {
+            File directory = new File(System.getProperty("user.dir") + File.separator + "basejars");
+            if (!directory.exists()) {
+                directory.mkdirs()
+            }
+            List jarNameList = null
+            if (StringUtils.isNotBlank(input)) {
+                String[] jarNames = input.split(",")
+                jarNameList = new ArrayList()
+                for (int i = 0; i < jarNames.length; i++) {
+                    jarNameList.add(jarNames[i])
+                }
+            }
+            for (String jarName : baseJarsVersion.keySet()) {
+                if (jarNameList != null) {
+                    if (!jarNameList.contains(baseJarManager.getBaseJarName(jarName)) && !jarNameList.contains(jarName)) {
+                        continue
+                    }
+                }
+                String version = baseJarsVersion.get(jarName)
+                FileOutputStream outputStream = FileUtils.openOutputStream(new File(directory.getAbsolutePath() + File.separator + jarName))
+                try {
+                    IOUtils.copy(baseJarManager.getJarInputStream(jarName, version), outputStream)
+                } finally {
+                    outputStream.close()
+                }
+            }
+            String zipFilePath = System.getProperty("user.dir") + File.separator + TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss") + "jar.zip"
+            com.dobybros.hulkadmin.utils.FileUtils.zipFiles(directory.getAbsolutePath(), zipFilePath)
+            FileInputStream zipfileStream = new FileInputStream(zipFilePath)
+            response.addHeader("Content-Disposition", "attachment;fileName=basejars.zip");
+            try {
+                IOUtils.copy(zipfileStream, response.getOutputStream())
+            } finally {
+                response.outputStream.close()
+                zipfileStream.close()
+            }
+            FileUtils.deleteQuietly(new File(zipFilePath))
+            FileUtils.deleteQuietly(directory)
+        }
     }
 
     @GetMapping("downzips/{input}")
@@ -647,7 +751,7 @@ public class AuthorizeController {
                 Document document = null
                 for (Map o : configs) {
                     document = new Document()
-                    if (!StringUtils.isNotBlank(o.get("_id"))) {
+                    if (StringUtils.isNotBlank(o.get("_id"))) {
                         serversService.deleteServerConfig(new Document().append("_id", o.get("_id")))
                         for (String key : o.keySet()) {
                             document.append(key.replaceAll("\\.", "_"), o.get(key).replaceAll(" ", ""))
@@ -663,6 +767,7 @@ public class AuthorizeController {
                         throw new GeneralException(Errors.ERROR_PARAMS_ILLEGAL, "The config must contains _id")
                     }
                 }
+                Logger.info(TAG, "Add configs success")
             }
         }
     }

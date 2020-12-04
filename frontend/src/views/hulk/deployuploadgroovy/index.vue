@@ -13,7 +13,7 @@
                             :action="uploadGroovys(1)"
                             :on-success="uploadSuccess"
                             :file-list="geoovysList"
-                            :limit="1"
+                            :limit="groovyLimit"
                             :auto-upload="true">
                         <el-button type="primary">{{$t("views.deploy.uploadGroovys")}}<i
                                 class="el-icon-upload el-icon--right"></i></el-button>
@@ -35,7 +35,8 @@
                     </a>
                 </el-col>
                 <el-col :span="1" style="margin-bottom: 20px;">
-                    <el-input style="width: 300px" v-model="searchInput" placeholder="input serverType or serviceName" @change="search" suffix-icon="el-icon-search"></el-input>
+                    <el-input style="width: 300px" v-model="searchInput" placeholder="input serverType or serviceName"
+                              @change="search" suffix-icon="el-icon-search"></el-input>
                 </el-col>
             </el-row>
             <div>
@@ -115,14 +116,16 @@
                     <el-upload
                             accept=".zip"
                             class="upload-demo"
-                            ref="upload"
+                            ref="uploadGroovy"
                             :action="uploadUrlData"
-                            :before-upload="beforeUploadGroovy"
+                            :on-success="uploadGroovySuccess"
+                            :on-progress="onProgress"
                             :file-list="fileList"
+                            :limit="groovyLimit"
                             :auto-upload="false">
-                <el-button slot="trigger" size="medium" type="primary">{{$t("views.deploy.upload")}}</el-button>
+                <el-button slot="trigger" size="medium" type="primary">{{$t("views.deploy.selectFile")}}</el-button>
                 <el-button style="margin-left: 10px;" size="medium" type="success"
-                           @click="submitUpload">{{$t("views.deploy.upload")}}</el-button>
+                           @click="submitUpload" :disabled="uploadDisabled">{{$t("views.deploy.upload")}}</el-button>
                     </el-upload>
                 </span>
 
@@ -182,7 +185,13 @@
     </el-container>
 </template>
 <script>
-    import {GetAllGroovyInfo, DeleteServiceVersion, RemoveService, DownloadAllGroovy, CheckServiceConfig} from "@api/deploy.api";
+    import {
+        GetAllGroovyInfo,
+        DeleteServiceVersion,
+        RemoveService,
+        DownloadAllGroovy,
+        CheckServiceConfig
+    } from "@api/deploy.api";
     import util from '@/libs/util'
 
     export default {
@@ -207,7 +216,9 @@
                 downloadDirectory: '',
                 groovyData: [],
                 cascaderValue: [],
-                searchInput: ''
+                searchInput: '',
+                uploadDisabled: false,
+                groovyLimit: 1
             }
         },
         created() {
@@ -232,7 +243,32 @@
             uploadSuccess(res, file, fileList) {
                 if (res.code === 1) {
                     this.$message.success("File " + file.name + " Upload Success!")
-                    location.reload()
+                    setTimeout(function () {
+                        location.reload()
+                    }, 1000)
+                } else {
+                    this.$message.error("File " + file.name + "Upload Failed! errMsg: " + res.message)
+                }
+                this.geoovysList = []
+                this.fileList = []
+            },
+            onProgress(event, file, fileList){
+                console.log(event,file,fileList)
+                debuggerf
+            },
+            uploadGroovySuccess(res, file, fileList) {
+                if (res.code === 1) {
+                    this.$message.success("File " + file.name + " Upload Success!")
+                    this.dialogVisible = false
+                    this.$refs.uploadGroovy.uploadFiles = []
+                    this.value = ''
+                    // this.uploadUrlData = ''
+                    this.serviceName = ''
+                    this.fileList = []
+                    this.uploadDisabled = false
+                    setTimeout(function () {
+                        location.reload()
+                    }, 1000)
                 } else {
                     this.$message.error("File " + file.name + "Upload Failed! errMsg: " + res.message)
                 }
@@ -245,6 +281,7 @@
                 if (data !== undefined) {
                     this.everyData = data
                     this.serviceName = data.serviceName
+                    this.uploadDisabled = false
                 } else {
                     this.everyData = {}
                     this.serviceName = ""
@@ -253,10 +290,10 @@
             uploadGroovys(num) {
                 return this.downloadGroovyUrl + "/open/groovyzips"
             },
-            beforeUploadGroovy(){
+            beforeUploadGroovy() {
                 CheckServiceConfig(this.serviceName, this.value)
                     .then(resp => {
-                        if(!resp.result){
+                        if (!resp.result) {
                             this.$message.error("Cant find config of " + resp.service + ", need configure first")
                         }
                         return resp
@@ -267,79 +304,9 @@
             },
             submitUpload() {
                 if (this.value !== null && this.serviceName !== null && this.value !== '' && this.serviceName !== '') {
-                    if (this.$refs.upload.uploadFiles.length > 0) {
-                        this.$refs.upload.submit();
-                        // let thisValue = ''
-                        // if (this.value.split(":")[1] !== undefined) {
-                        //     thisValue = this.value.split(":")[1].trim()
-                        // } else {
-                        //     thisValue = this.value
-                        // }
-                        // if (this.everyData["maxVersion"] !== undefined) {
-                        //     if (thisValue > this.everyData["maxVersion"].trim()) {
-                        //         let oldVersion = this.everyData["version"]
-                        //         let oldDate = this.everyData["date"]
-                        //         this.everyData["children"].unshift({
-                        //             "serviceName": this.serviceName,
-                        //             "version": oldVersion,
-                        //             "date": oldDate
-                        //         })
-                        //         this.everyData["versions"].unshift({"value": "version: " + thisValue})
-                        //         this.everyData["maxVersion"] = thisValue
-                        //         this.everyData["version"] = thisValue
-                        //         this.everyData["date"] = this.timeFormat(new Date().getTime())
-                        //     } else if (thisValue === this.everyData["maxVersion"].trim()) {
-                        //         this.everyData["date"] = this.timeFormat(new Date().getTime())
-                        //     } else if (thisValue < this.everyData["maxVersion"].trim()) {
-                        //         let existItem = false
-                        //         for (let i = 0; i < this.everyData["children"].length; i++) {
-                        //             let data3 = this.everyData["children"][i]
-                        //             if (data3["version"] === thisValue) {
-                        //                 existItem = true
-                        //                 data3["date"] = this.timeFormat(new Date().getTime())
-                        //             }
-                        //         }
-                        //         if (!existItem) {
-                        //             for (let i = 0; i < this.everyData["children"].length; i++) {
-                        //                 let data3 = this.everyData["children"][i]
-                        //                 if (thisValue > data3["version"]) {
-                        //                     existItem = true
-                        //                     this.everyData["versions"].splice(i + 1, 0, {"value": "version: " + thisValue})
-                        //                     this.everyData["children"].splice(i, 0, {
-                        //                         "version": thisValue,
-                        //                         "serviceName": this.serviceName,
-                        //                         "date": this.timeFormat(new Date().getTime())
-                        //                     })
-                        //                     break
-                        //                 }
-                        //             }
-                        //         }
-                        //         if (!existItem) {
-                        //             this.everyData["versions"].push({"value": "version: " + thisValue})
-                        //             this.everyData["children"].push({
-                        //                 "version": thisValue,
-                        //                 "serviceName": this.serviceName,
-                        //                 "date": this.timeFormat(new Date().getTime())
-                        //             })
-                        //         }
-                        //     }
-                        // } else {
-                        //     this.tableData.push({
-                        //         "maxVersion": thisValue,
-                        //         "version": thisValue,
-                        //         "serviceName": this.serviceName,
-                        //         "date": this.timeFormat(new Date().getTime()),
-                        //         "versions": [{"value": "version: " + thisValue}],
-                        //         "children": []
-                        //     })
-                        // }
-                        this.dialogVisible = false
-                        this.$refs.upload.uploadFiles = []
-                        this.value = ''
-                        this.uploadUrlData = ''
-                        this.serviceName = ''
-                        this.fileList = []
-                        location.reload()
+                    if (this.$refs.uploadGroovy.uploadFiles.length > 0) {
+                        this.uploadDisabled = true
+                        this.$refs.uploadGroovy.submit();
                     } else {
                         this.$message.error('Please select a file to upload!');
                     }
@@ -352,12 +319,15 @@
                 callback(results)
             },
             cancelEdit() {
+                // this.$refs.uploadGroovy.abort({file: this.$refs.uploadGroovy.uploadFiles[0]})
                 this.dialogVisible = false
                 this.everyData = {}
                 this.value = ''
-                this.uploadUrlData = ''
+                // this.uploadUrlData = ''
                 this.serviceName = ''
-                this.$refs.upload.uploadFiles = []
+                this.$refs.uploadGroovy.uploadFiles = []
+                this.uploadDisabled = false
+                location.reload()
             },
             deleteServiceVersion() {
                 this.dialogVisible = false
@@ -416,7 +386,7 @@
             newServiceVersion() {
                 this.openUploadDialog()
             },
-            search(){
+            search() {
                 GetAllGroovyInfo(this.searchInput)
                     .then(resp => {
                         this.$message.success("Updated!")

@@ -32,4 +32,15 @@ class ServerType {
     void setNginxName(String nginxName) {
         this.nginxName = nginxName
     }
+    static String getGroovyTypeStr(Integer groovyCloudType){
+        switch (groovyCloudType){
+            case 10:
+                return "Container"
+            case 20:
+                return "IMContainer"
+            case 30:
+                return "ProxyContainer"
+            default:return "Unknown"
+        }
+    }
 }

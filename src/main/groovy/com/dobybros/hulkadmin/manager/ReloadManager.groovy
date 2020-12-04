@@ -88,7 +88,7 @@ class ReloadManager {
                             deployRecordService.upateDeployRecordServer(oldDeployId, ipDockerName, DeployRecord.DEPLOY_SERVER_STOP + DeployRecord.DEPLOY_SERVER_SEPEATOR + "Replace by ${deployId}")
                         } else {
                             String status = deployIngMap.get(ipDockerName)
-                            if(!status.contains(DeployRecord.DEPLOY_SERVER_SUCCESS) && !status.contains(DeployRecord.DEPLOY_SERVER_FAILED)){
+                            if (!status.contains(DeployRecord.DEPLOY_SERVER_SUCCESS) && !status.contains(DeployRecord.DEPLOY_SERVER_FAILED)) {
                                 deployRecordService.upateDeployRecordServer(oldDeployId, ipDockerName, deployIngMap.get(ipDockerName) + DeployRecord.DEPLOY_SERVER_SEPEATOR + "Replace by ${deployId}")
                             }
                         }
@@ -157,7 +157,7 @@ class ReloadManager {
                 if (ipDockerNames != null && !ipDockerNames.isEmpty()) {
                     int mustHasServerSize = 1
                     if (ipDockerNames.size() >= 4) {
-                        mustHasServerSize = ipDockerNames / 4
+                        mustHasServerSize = ipDockerNames.size() / 4
                     }
                     List dockerStatuses = dockerStatusService.getDockerStatusByCondition(null, null, serverType, DockerStatus.STATUS_OK, deployId)
                     if (nginxManager.canLoadNginx(deployId, serverType)) {
@@ -201,7 +201,6 @@ class ReloadManager {
                                         }
                                         if (dockerNames.isEmpty()) {
                                             releaseTimerTask(serverType, "Deploy")
-                                            updateDeployBaseJarVersions(deployId)
                                             Logger.info(TAG, "Reload ${serverType} all servers finish")
                                         }
                                     } else {
@@ -221,25 +220,6 @@ class ReloadManager {
 
         addTimerTask(serverType, "Deploy", timerTaskEx)
         TimerEx.schedule(timerTaskEx, 5000L, 5000L)
-    }
-
-    private void updateDeployBaseJarVersions(String deployId) {
-        DeployRecord deployRecord = deployRecordService.getDeployRecord(deployId)
-        DeployServiceVersion deployServiceVersion = deployServiceVersionService.getDeployServiceVersionByDeployId(deployId)
-        if (deployRecord != null && deployServiceVersion != null) {
-            Map updateBaseJarVersions = deployRecord.getUpdateBaseJarVersions()
-            if (updateBaseJarVersions != null && !updateBaseJarVersions.isEmpty()) {
-                Map deployBaseJarVersions = deployServiceVersion.getBaseJarVersions()
-                if (deployBaseJarVersions == null) {
-                    deployBaseJarVersions = new HashMap()
-                }
-                for (String jarName : updateBaseJarVersions.keySet()) {
-                    deployBaseJarVersions[jarName] = updateBaseJarVersions[jarName]
-                }
-                deployServiceVersionService.updateBaseJarVersions(deployServiceVersion.get_id(), deployBaseJarVersions)
-                Logger.info(TAG, "DeployServiceVersion updateBaseJarVersions success")
-            }
-        }
     }
 
     private void addObserverServerTask(String serverType, String ipDockerName, Integer allAvailableSize, String newDeployId, boolean needNoUser) {
@@ -281,7 +261,7 @@ class ReloadManager {
             }
         }
         addTimerTask(serverType, ipDockerName, timerTaskEx)
-        TimerEx.schedule(timerTaskEx, 10000L, 10000L)
+        TimerEx.schedule(timerTaskEx, 5000L, 10000L)
     }
 
     private void addTimerTask(String serverType, String taskName, TimerTaskEx timerTaskEx) {
@@ -342,68 +322,89 @@ class ReloadManager {
                 }
                 switch (serverTypeData.getGroovyCloudType()) {
                     case DockerStatus.TYPE_NORMAL:
-                        for (String ipDockerName : ipDockerNames) {
-                            String[] ipDockerNameStrs = ipDockerName.split(ServerManager.IPDOCKERNAME_SYMBOL)
+                        if (ipDockerNames.size() == 1) {
+                            String[] ipDockerNameStrs = ipDockerNames[0].split(ServerManager.IPDOCKERNAME_SYMBOL)
                             String ip = ipDockerNameStrs[0]
                             String dockerName = ipDockerNameStrs[1]
-                            List dockerStatuses = dockerStatusService.getDockerStatusByCondition(ip, dockerName, serverType, null, null)
-                            if (dockerStatuses == null || dockerStatuses.isEmpty()) {
-                                Logger.info(TAG, "Because dockerStatus not exist, will relaod first, serverType: ${serverType} ip: ${ip} dockerName: ${dockerName}")
-                                reloadContainer(serverType, ip, dockerName, deployId, false, null)
+                            Logger.info(TAG, "Because only one dockerName, will relaod first, serverType: ${serverType} ipDockerName: ${ipDockerNames[0]}")
+                            reloadContainer(serverType, ip, dockerName, deployId, false, null)
+                        } else {
+                            for (String ipDockerName : ipDockerNames) {
+                                String[] ipDockerNameStrs = ipDockerName.split(ServerManager.IPDOCKERNAME_SYMBOL)
+                                String ip = ipDockerNameStrs[0]
+                                String dockerName = ipDockerNameStrs[1]
+                                List dockerStatuses = dockerStatusService.getDockerStatusByCondition(ip, dockerName, serverType, null, null)
+                                if (dockerStatuses == null || dockerStatuses.isEmpty()) {
+                                    Logger.info(TAG, "Because dockerStatus not exist, will relaod first, serverType: ${serverType} ip: ${ip} dockerName: ${dockerName}")
+                                    reloadContainer(serverType, ip, dockerName, deployId, false, null)
+                                }
                             }
-                        }
-                        List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatusByServerType(serverType)
-                        for (DockerStatus dockerStatus : dockerStatuses) {
-                            if (dockerStatus.status != DockerStatus.STATUS_OK) {
-                                Logger.info(TAG, "Because dockerStatus status is not ok, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
-                                reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
-                            } else {
-                                serviceVersion = getCurrentServiceVersion(serverType)
-                                if (serviceVersion != null) {
-                                    if (!dockerStatus.getDeployId().equals(serviceVersion.getDeployId())) {
-                                        Logger.info(TAG, "Because dockerStatus deployId != serviceVersion's deployId, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
-                                        reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
-                                    } else {
-                                        addObserverServerTask(serverType, dockerStatus.getIp() + ServerManager.IPDOCKERNAME_SYMBOL + dockerStatus.getDockerName(), allAvailableSize, deployId, false)
-                                    }
-                                } else {
-                                    Logger.info(TAG, "Because serviceVersion is not exist, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
+                            List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatusByServerType(serverType)
+                            for (DockerStatus dockerStatus : dockerStatuses) {
+                                if (dockerStatus.status != DockerStatus.STATUS_OK) {
+                                    Logger.info(TAG, "Because dockerStatus status is not ok, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
                                     reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
+                                } else {
+                                    serviceVersion = getCurrentServiceVersion(serverType)
+                                    if (serviceVersion != null) {
+                                        if (!dockerStatus.getDeployId().equals(serviceVersion.getDeployId())) {
+                                            Logger.info(TAG, "Because dockerStatus deployId != serviceVersion's deployId, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
+                                            reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
+                                        } else {
+                                            addObserverServerTask(serverType, dockerStatus.getIp() + ServerManager.IPDOCKERNAME_SYMBOL + dockerStatus.getDockerName(), allAvailableSize, deployId, false)
+                                        }
+                                    } else {
+                                        Logger.info(TAG, "Because serviceVersion is not exist, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
+                                        reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
+                                    }
                                 }
                             }
                         }
                         break
                     case DockerStatus.TYPE_GATEWAY:
                     case DockerStatus.TYPE_PROXY:
-                        for (String ipDockerName : ipDockerNames) {
-                            String[] ipDockerNameStrs = ipDockerName.split(ServerManager.IPDOCKERNAME_SYMBOL)
+                        if (ipDockerNames.size() == 1) {
+                            String[] ipDockerNameStrs = ipDockerNames[0].split(ServerManager.IPDOCKERNAME_SYMBOL)
                             String ip = ipDockerNameStrs[0]
                             String dockerName = ipDockerNameStrs[1]
-                            List availableDockerStatuses = dockerStatusService.getDockerStatusByCondition(ip, dockerName, serverType, null, null)
-                            if (availableDockerStatuses == null || availableDockerStatuses.isEmpty()) {
-                                Logger.info(TAG, "Because dockerStatus not exist, will relaod first, serverType: ${serverType} ip: ${ip} dockerName: ${dockerName}")
-                                reloadContainer(serverType, ip, dockerName, deployId, false, null)
-                            }
-                        }
-                        List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatusByServerType(serverType)
-                        for (DockerStatus dockerStatus : dockerStatuses) {
-                            String ipDockerName = dockerStatus.getIp() + ServerManager.IPDOCKERNAME_SYMBOL + dockerStatus.getDockerName()
-                            if (dockerStatus.status != DockerStatus.STATUS_OK && dockerStatus.status != DockerStatus.STATUS_PAUSE) {
-                                if (ipDockerNames.contains(ipDockerName)) {
-                                    Logger.info(TAG, "Because dockerStatus status is not ok, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
-                                    reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
+                            Logger.info(TAG, "Because only one dockerName, will relaod first, serverType: ${serverType} ipDockerName: ${ipDockerNames[0]}")
+                            reloadContainer(serverType, ip, dockerName, deployId, false, null)
+                        } else {
+                            for (String ipDockerName : ipDockerNames) {
+                                String[] ipDockerNameStrs = ipDockerName.split(ServerManager.IPDOCKERNAME_SYMBOL)
+                                String ip = ipDockerNameStrs[0]
+                                String dockerName = ipDockerNameStrs[1]
+                                List availableDockerStatuses = dockerStatusService.getDockerStatusByCondition(ip, dockerName, serverType, null, null)
+                                if (availableDockerStatuses == null || availableDockerStatuses.isEmpty()) {
+                                    Logger.info(TAG, "Because dockerStatus not exist, will relaod first, serverType: ${serverType} ip: ${ip} dockerName: ${dockerName}")
+                                    reloadContainer(serverType, ip, dockerName, deployId, false, null)
                                 }
-//                            } else if (!noOnlineUser(dockerStatus)) {
-//                                    if (canReload(allAvailableSize, serverType, dockerStatus.getIp(), dockerStatus.getDockerName()) && !noOnlineUser(dockerStatus)) {
-//                                        if (ipDockerNames.contains(ipDockerName)) {
-//                                            Logger.info(TAG, "Because dockerStatus no onOnlineUser, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
-//                                            reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
-//                                        }
-//                                    } else {
-//                                        addObserverServerTask(serverType, ipDockerName, allAvailableSize, deployId, true)
-//                                    }
-                            } else {
-                                addObserverServerTask(serverType, ipDockerName, allAvailableSize, deployId, true)
+                            }
+                            List<DockerStatus> dockerStatuses = dockerStatusService.getDockerStatusByServerType(serverType)
+                            List<DockerStatus> noUserDockerStatuses = new ArrayList<>()
+                            List<DockerStatus> hasUserDockerStatuses = new ArrayList<>()
+                            for (DockerStatus dockerStatus : dockerStatuses) {
+                                String ipDockerName = dockerStatus.getIp() + ServerManager.IPDOCKERNAME_SYMBOL + dockerStatus.getDockerName()
+                                if (dockerStatus.status != DockerStatus.STATUS_OK && dockerStatus.status != DockerStatus.STATUS_PAUSE) {
+                                    if (ipDockerNames.contains(ipDockerName)) {
+                                        Logger.info(TAG, "Because dockerStatus status is not ok, will relaod first, serverType: ${serverType} server: ${dockerStatus.getServer()}")
+                                        reloadContainer(serverType, dockerStatus.getIp(), dockerStatus.getDockerName(), deployId, true, dockerStatus.getServer())
+                                    }
+                                } else {
+                                    if(noOnlineUser(dockerStatus)){
+                                        noUserDockerStatuses.add(dockerStatus)
+                                    }else {
+                                        hasUserDockerStatuses.add(dockerStatus)
+                                    }
+                                }
+                            }
+                            noUserDockerStatuses.addAll(hasUserDockerStatuses)
+                            if(!noUserDockerStatuses.isEmpty()){
+                                for (DockerStatus dockerStatus : noUserDockerStatuses){
+                                    String ipDockerName = dockerStatus.getIp() + ServerManager.IPDOCKERNAME_SYMBOL + dockerStatus.getDockerName()
+                                    addObserverServerTask(serverType, ipDockerName, allAvailableSize, deployId, true)
+                                    Thread.sleep(5000)
+                                }
                             }
                         }
                         break
@@ -537,10 +538,6 @@ class ReloadManager {
                 default:
                     Logger.error(TAG, "NoOnlineUser, illegal groovyCloudType: ${dockerStatus.getType()}")
                     break
-            }
-        } else {
-            if (result != null) {
-                throw new GeneralException(result.getCode(), result.getMsg())
             }
         }
 

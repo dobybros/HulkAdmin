@@ -38,12 +38,12 @@
                                     size="medium">
                                 {{$t("views.deploy.seeServices")}}
                             </el-button>
-                            <el-button
-                                    @click.native.prevent="openJars(scope.row)"
-                                    type="primary"
-                                    size="medium">
-                                {{$t("views.deploy.seeJars")}}
-                            </el-button>
+<!--                            <el-button-->
+<!--                                    @click.native.prevent="openJars(scope.row)"-->
+<!--                                    type="primary"-->
+<!--                                    size="medium">-->
+<!--                                {{$t("views.deploy.seeJars")}}-->
+<!--                            </el-button>-->
                             <el-button
                                     @click.native.prevent="openServers(scope.row)"
                                     type="primary"
@@ -70,21 +70,21 @@
                 </el-table-column>
             </el-table>
         </el-dialog>
-        <el-dialog width="60%" :visible.sync="jarDialogView" :title="this.remindJars">
-            <el-table
-                    :data="jars.baseJarVersions"
-                    border
-                    height="700px">
-                <el-table-column
-                        prop="jarName"
-                        label="jarName">
-                </el-table-column>
-                <el-table-column
-                        prop="version"
-                        label="version">
-                </el-table-column>
-            </el-table>
-        </el-dialog>
+<!--        <el-dialog width="60%" :visible.sync="jarDialogView" :title="this.remindJars">-->
+<!--            <el-table-->
+<!--                    :data="jars.baseJarVersions"-->
+<!--                    border-->
+<!--                    height="700px">-->
+<!--                <el-table-column-->
+<!--                        prop="jarName"-->
+<!--                        label="jarName">-->
+<!--                </el-table-column>-->
+<!--                <el-table-column-->
+<!--                        prop="version"-->
+<!--                        label="version">-->
+<!--                </el-table-column>-->
+<!--            </el-table>-->
+<!--        </el-dialog>-->
         <el-dialog width="60%" :visible.sync="serversDialogView" :title="this.remindServers">
             <el-table
                     :data="servers.deployServers"

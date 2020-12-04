@@ -24,6 +24,7 @@ class DeployRecord extends DataObject{
     public static final String DEPLOY_SERVER_STARTING = "STARTING"
     public static final String DEPLOY_SERVER_WAITSTART = "WAITSTART"
     public static final String DEPLOY_SERVER_STOP = "STOP"
+    public static final String DEPLOY_SERVER_WAIT = "WAIT"
     public static final String DEPLOY_SERVER_SEPEATOR = " || "
     private Map<String, String> deployIngMap
     private Map<String, String> serviceVersions

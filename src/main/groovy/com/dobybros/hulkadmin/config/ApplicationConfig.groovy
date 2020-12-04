@@ -47,7 +47,5 @@ class ApplicationConfig {
     public String databaseHost
     @Value('${log.kibana.url}')
     public String logKibanaUrl
-    @Value('${base.jars.path}')
-    public String basrJarsPath
 
 }
