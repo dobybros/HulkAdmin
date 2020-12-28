@@ -15,6 +15,10 @@
                     >
                     </el-table-column>
                     <el-table-column
+                        prop="serverName"
+                        label="serverName">
+                    </el-table-column>
+                    <el-table-column
                             prop="description"
                             label="description"
                             width="250Px"
@@ -38,7 +42,7 @@
                     <el-table-column
                             prop="createTime"
                             label="createTime"
-                            width="200Px">
+                            width="110Px">
                     </el-table-column>
                     <el-table-column
                             label="Operations"
