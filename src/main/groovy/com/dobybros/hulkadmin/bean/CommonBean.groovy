@@ -4,11 +4,13 @@ import com.dobybros.hulkadmin.config.ApplicationConfig
 import com.docker.file.adapters.GridFSFileHandler
 import com.docker.rpc.remote.stub.ServiceStubManager
 import com.docker.storage.adapters.ServiceVersionService
+import com.docker.storage.adapters.impl.DeployServiceVersionServiceImpl
 import com.docker.storage.adapters.impl.DockerStatusServiceImpl
 import com.docker.storage.adapters.impl.RepairServiceImpl
 import com.docker.storage.adapters.impl.ServersServiceImpl
 import com.docker.storage.adapters.impl.ServiceVersionServiceImpl
 import com.docker.storage.mongodb.MongoHelper
+import com.docker.storage.mongodb.daos.DeployServiceVersionDAO
 import com.docker.storage.mongodb.daos.DockerStatusDAO
 import com.docker.storage.mongodb.daos.RepairDAO
 import com.docker.storage.mongodb.daos.ServersDAO
@@ -32,14 +34,16 @@ class CommonBean {
     @Autowired
     ApplicationConfig applicationConfig
     private MongoHelper dockerStatusHelper
+
     @Bean
     ServiceStubManager serviceStubManager() {
         ServiceStubManager serviceStubManager = new ServiceStubManager();
         serviceStubManager.init()
         return serviceStubManager
     }
+
     @Bean
-    GridFSFileHandler fileAdapter(){
+    GridFSFileHandler fileAdapter() {
         GridFSFileHandler fileAdapter = new GridFSFileHandler()
         MongoHelper gridfsHelper = new MongoHelper();
         gridfsHelper.setHost(applicationConfig.gridfsHost);
@@ -53,17 +57,40 @@ class CommonBean {
         fileAdapter.init()
         return fileAdapter;
     }
+
     @Bean
-    public ServersServiceImpl serversService(){
+    public ServersServiceImpl serversService() {
         return new ServersServiceImpl()
     }
+
     @Bean
-    public RepairServiceImpl repairService(){
+    public RepairServiceImpl repairService() {
         return new RepairServiceImpl()
     }
 
     @Bean
-    public ServersDAO serversDAO(){
+    public DeployServiceVersionServiceImpl deployServiceVersionService() {
+        DeployServiceVersionServiceImpl deployServiceVersionService = new DeployServiceVersionServiceImpl()
+        deployServiceVersionService.setDeployServiceVersionDAO(deployServiceVersionDAO())
+        return deployServiceVersionService
+    }
+
+    public DeployServiceVersionDAO deployServiceVersionDAO() {
+        MongoHelper configHelper = new MongoHelper();
+        configHelper.setHost(applicationConfig.databaseHost);
+        configHelper.setConnectionsPerHost(Integer.valueOf(applicationConfig.connectionsPerHost));
+        configHelper.setDbName(applicationConfig.dockerStatusDBName);
+        configHelper.setUsername(applicationConfig.mongoUserName);
+        configHelper.setPassword(applicationConfig.mongoPassword);
+        configHelper.init()
+        DeployServiceVersionDAO deployServiceVersionDAO = new DeployServiceVersionDAO();
+        deployServiceVersionDAO.setMongoHelper(configHelper);
+        deployServiceVersionDAO.init()
+        return deployServiceVersionDAO
+    }
+
+    @Bean
+    public ServersDAO serversDAO() {
         MongoHelper configHelper = new MongoHelper();
         configHelper.setHost(applicationConfig.databaseHost);
         configHelper.setConnectionsPerHost(Integer.valueOf(applicationConfig.connectionsPerHost));
@@ -76,8 +103,9 @@ class CommonBean {
         serversDAO.init()
         return serversDAO
     }
+
     @Bean
-    public RepairDAO repairDAO(){
+    public RepairDAO repairDAO() {
         MongoHelper repairHelper = new MongoHelper();
         repairHelper.setHost(applicationConfig.databaseHost);
         repairHelper.setConnectionsPerHost(Integer.valueOf(applicationConfig.connectionsPerHost));
@@ -90,8 +118,9 @@ class CommonBean {
         repairDAO.init()
         return repairDAO
     }
+
     @Bean
-    public DockerStatusServiceImpl dockerStatusService(){
+    public DockerStatusServiceImpl dockerStatusService() {
         DockerStatusDAO dockerStatusDAO = new DockerStatusDAO()
         dockerStatusDAO.setMongoHelper(getDockerStatusHelper())
         dockerStatusDAO.init()
@@ -99,8 +128,9 @@ class CommonBean {
         dockerStatusService.setDockerStatusDAO(dockerStatusDAO)
         return dockerStatusService
     }
+
     @Bean
-    public ServiceVersionServiceImpl serviceVersionService(){
+    public ServiceVersionServiceImpl serviceVersionService() {
         ServiceVersionDAO serviceVersionDAO = new ServiceVersionDAO()
         serviceVersionDAO.setMongoHelper(getDockerStatusHelper())
         serviceVersionDAO.init()
@@ -108,6 +138,7 @@ class CommonBean {
         serviceVersionService.setServiceVersionDAO(serviceVersionDAO)
         return serviceVersionService
     }
+
     @Bean
     public WebServerFactoryCustomizer cookieProcessorCustomizer() {
         return new WebServerFactoryCustomizer() {
@@ -125,8 +156,9 @@ class CommonBean {
             }
         };
     }
-    private synchronized MongoHelper getDockerStatusHelper(){
-        if(dockerStatusHelper == null){
+
+    private synchronized MongoHelper getDockerStatusHelper() {
+        if (dockerStatusHelper == null) {
             dockerStatusHelper = new MongoHelper();
             dockerStatusHelper.setHost(applicationConfig.databaseHost);
             dockerStatusHelper.setConnectionsPerHost(Integer.valueOf(applicationConfig.connectionsPerHost));

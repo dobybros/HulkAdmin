@@ -69,6 +69,7 @@ module.exports = {
               }
             })
           ])
+            .minimize(false)
       })
     // markdown
     config.module

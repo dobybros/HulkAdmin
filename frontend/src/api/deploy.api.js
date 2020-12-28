@@ -82,7 +82,31 @@ export function RemoveService(service) {
 
 export function GetAllServiceVersions() {
     return request({
-        url: '/deploy/serviceversions',
+        url: '/deploy/deployserviceversions',
+        method: 'get'
+    })
+}
+export function GetDeployServiceVersion(id) {
+    return request({
+        url: '/deploy/deployserviceversions/services/' + id,
+        method: 'get'
+    })
+}
+export function AddDeployService(id, serviceName) {
+    return request({
+        url: '/deploy/deployserviceversions/services/' + id + "/service/" + serviceName,
+        method: 'post'
+    })
+}
+export function RemoveDeployService(id, serviceName) {
+    return request({
+        url: '/deploy/deployserviceversions/services/' + id + "/service/" + serviceName,
+        method: 'delete'
+    })
+}
+export function RepairDployServiceVersions() {
+    return request({
+        url: '/deploy/repairdeployserviceversion',
         method: 'get'
     })
 }
@@ -97,8 +121,32 @@ export function SaveServiceVersion(data) {
 
 export function RemoveServiceVersion(id) {
     return request({
-        url: '/deploy/serviceversion?i=' + id,
+        url: '/deploy/deployserviceversion?i=' + id,
         method: 'delete'
+    })
+}
+export function GetDeployRecords(searchInput) {
+    return request({
+        url: '/deploy/deployrecords?s=' + searchInput,
+        method: 'get'
+    })
+}
+export function GetThisServiceVersions(id) {
+    return request({
+        url: '/deploy/thisserviceversions/' + id,
+        method: 'get'
+    })
+}
+export function GetThisBaseJars(id) {
+    return request({
+        url: '/deploy/newbaseJars/' + id,
+        method: 'get'
+    })
+}
+export function GetDeployServers(id) {
+    return request({
+        url: '/deploy/deployserver/' + id,
+        method: 'get'
     })
 }
 
@@ -138,11 +186,10 @@ export function GetAllContainer() {
     })
 }
 
-export function ReloadContainer(data) {
+export function ReloadContainer(id) {
     return request({
-        url: '/deploy/container',
-        method: 'post',
-        data: data
+        url: '/deploy/container/' + id,
+        method: 'get'
     })
 }
 
@@ -237,6 +284,18 @@ export function GCRepair(id) {
     return request({
         url: '/repair/' + id,
         method: 'post'
+    })
+}
+export function RepairBaseJars() {
+    return request({
+        url: '/deploy/repairbaseJars',
+        method: 'get'
+    })
+}
+export function GetBaseJars(id) {
+    return request({
+        url: '/deploy/baseJars/' + id,
+        method: 'get'
     })
 }
 

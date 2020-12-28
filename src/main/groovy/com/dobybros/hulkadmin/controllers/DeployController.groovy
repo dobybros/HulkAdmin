@@ -1,27 +1,51 @@
 package com.dobybros.hulkadmin.controllers
 
+import chat.errors.CoreException
+import chat.json.Result
 import chat.logs.LoggerEx
+import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.JSONObject
 import com.dobybros.hulkadmin.config.ApplicationConfig
 import com.dobybros.hulkadmin.config.NginxConfig
+import com.dobybros.hulkadmin.data.DeployRecord
+import com.dobybros.hulkadmin.data.Nginx
+import com.dobybros.hulkadmin.data.Server
+import com.dobybros.hulkadmin.data.ServerType
+import com.dobybros.hulkadmin.error.Errors
 import com.dobybros.hulkadmin.general.GeneralException
 import com.dobybros.hulkadmin.general.Logger
+import com.dobybros.hulkadmin.manager.BaseJarManager
+import com.dobybros.hulkadmin.manager.GroovyZipManager
+import com.dobybros.hulkadmin.manager.ReloadManager
+import com.dobybros.hulkadmin.manager.WebVersionManager
+import com.dobybros.hulkadmin.manager.config.NginxManager
+import com.dobybros.hulkadmin.manager.config.ServerManager
+import com.dobybros.hulkadmin.manager.config.ServerTypeManager
+import com.dobybros.hulkadmin.manager.db.RedisManager
+import com.dobybros.hulkadmin.service.impl.DeployRecordServiceImpl
+import com.dobybros.hulkadmin.utils.CommonStants
+import com.dobybros.hulkadmin.utils.RequestUtils
 import com.dobybros.hulkadmin.utils.SftpClient
 import com.dobybros.hulkadmin.utils.ShellClient
 import com.dobybros.hulkadmin.utils.TimeUtils
+import com.docker.data.DeployServiceVersion
 import com.docker.data.DockerStatus
 import com.docker.data.ServiceVersion
 import com.docker.file.adapters.GridFSFileHandler
+import com.docker.storage.adapters.impl.DeployServiceVersionServiceImpl
 import com.docker.storage.adapters.impl.DockerStatusServiceImpl
 import com.docker.storage.adapters.impl.ServersServiceImpl
 import com.docker.storage.adapters.impl.ServiceVersionServiceImpl
 import com.mongodb.BasicDBObject
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang.StringUtils
+import org.apache.commons.lang.exception.ExceptionUtils
 import org.bson.Document
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.web.bind.annotation.*
 import script.file.FileAdapter
+import script.memodb.ObjectId
 
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
@@ -38,7 +62,6 @@ class DeployController {
     private final String nginxFileName = "nginx.conf"
     private final String GROOVYCLOUYDSERVERS = "groovycloud.servers"
     private final String GROOVYCLOUYDSERVERS1 = "groovycloud.server."
-    public static final String SERVICE_VERSION_SYMBOL = "_v"
 
     @Autowired
     ApplicationConfig applicationConfig
@@ -47,13 +70,29 @@ class DeployController {
     @Autowired
     GridFSFileHandler fileAdapter
     @Autowired
-    RedisTemplate redisTemplate
-    @Autowired
     ServersServiceImpl serversService
     @Autowired
     DockerStatusServiceImpl dockerStatusService
     @Autowired
-    ServiceVersionServiceImpl serviceVersionService
+    DeployServiceVersionServiceImpl deployServiceVersionService
+    @Autowired
+    RedisManager redisManager
+    @Autowired
+    ServerTypeManager serverTypeManager
+    @Autowired
+    ServerManager serverManager
+    @Autowired
+    GroovyZipManager groovyZipManager
+    @Autowired
+    BaseJarManager baseJarManager
+    @Autowired
+    DeployRecordServiceImpl deployRecordService
+    @Autowired
+    ReloadManager reloadManager
+    @Autowired
+    NginxManager nginxManager
+    @Autowired
+    WebVersionManager webVersionManager
 
     @GetMapping("repairconfig")
     def repairConfig() {
@@ -62,8 +101,8 @@ class DeployController {
             for (String key : document.keySet()) {
                 if (key.equals("_id")) {
                     String value = document.get(key)
-                    if (!value.contains(SERVICE_VERSION_SYMBOL)) {
-                        document.put(key, value + SERVICE_VERSION_SYMBOL + "1")
+                    if (!value.contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
+                        document.put(key, value + CommonStants.SERVICE_VERSION_SYMBOL + "1")
                         serversService.deleteServerConfig(new Document().append("_id", value))
                         try {
                             serversService.addServerConfig(document)
@@ -77,10 +116,62 @@ class DeployController {
         }
     }
 
+    @GetMapping("repairbaseJars")
+    def repairBaseJars() {
+        File file = new File(applicationConfig.basrJarsPath)
+        if (file.exists() && file.isDirectory()) {
+            List<File> files = file.listFiles()
+            if (files != null && !files.isEmpty()) {
+                for (File jarFile : files) {
+                    baseJarManager.uploadBaseJar(FileUtils.openInputStream(jarFile), jarFile.getName())
+                }
+            }
+        } else {
+            throw new GeneralException(Errors.ERROR_PARAMS_ILLEGAL, "File ${applicationConfig.basrJarsPath} is illegal")
+        }
+        Logger.info(TAG, "Repair base jars finish!")
+    }
+
+    @GetMapping("baseJars/{serverType}")
+    def getBaseJars(@PathVariable String serverType) {
+        DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
+        Map result = new HashMap()
+        result.put("serverType", serverType)
+        if (deployServiceVersion != null) {
+            if (deployServiceVersion.baseJarVersions != null) {
+                List<Map> list = new ArrayList<>()
+                Map normalBaseJarsMap = baseJarManager.convertJarName(deployServiceVersion.baseJarVersions)
+                for (String jarName : normalBaseJarsMap.keySet()) {
+                    Map map = new HashMap()
+                    map.put("jarName", jarName)
+                    map.put("version", TimeUtils.getDateString(normalBaseJarsMap.get(jarName), "yyyyMMddHHmmss"))
+                    if (jarName.contains("container")) {
+                        list.add(0, map)
+                    } else {
+                        list.add(map)
+                    }
+                }
+                if (!list.isEmpty()) {
+                    result.put("baseJarVersions", list)
+                }
+            }
+            Map ipDockerNamesMap = serverManager.getDockerNames(serverType)
+            List list = new ArrayList()
+            for (String ip : ipDockerNamesMap.keySet()) {
+                Map map = new HashMap()
+                map.put("ip", ip)
+                map.put("dockerNames", JSON.toJSONString(ipDockerNamesMap.get(ip)))
+                list.add(map)
+            }
+            result.put("servers", list)
+        }
+        return result
+    }
+
     @GetMapping("/serviceconfig/healthy")
-    def checkServiceVersionConfig(@RequestParam(value = "s") String serviceName, @RequestParam(value = "v") String version){
+    def checkServiceVersionConfig(@RequestParam(value = "s") String serviceName, @RequestParam(value = "v") String version) {
         String serviceNameVersion = null
-        if(version != null){
+        if (version != null) {
             String versionNumber = null
             String[] versionStrs = version.split(":")
             if (versionStrs.length > 1) {
@@ -102,28 +193,29 @@ class DeployController {
         }
         return ["result": false, "service": serviceNameVersion]
     }
-    private Map getServices(){
+
+    private Map getServices() {
         List<Document> documents = serversService.getServerConfigs()
         Map serviceMap = new HashMap()
         serviceMap.put("value", "service")
         serviceMap.put("label", "service")
         Map serviceVersionNewMap = new HashMap()
         Map serviceVersionMap = new HashMap()
-        for(Document document : documents){
+        for (Document document : documents) {
             String serviceVersion = document.get("_id")
-            if(serviceVersion.contains(SERVICE_VERSION_SYMBOL)){
-                String service = serviceVersion.split(SERVICE_VERSION_SYMBOL)[0]
-                String version = serviceVersion.split(SERVICE_VERSION_SYMBOL)[1]
+            if (serviceVersion.contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
+                String service = serviceVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[0]
+                String version = serviceVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[1]
                 List theVersionList = serviceVersionMap.get(service)
                 String theNewVersion = serviceVersionNewMap.get(service)
-                if(theNewVersion == null){
+                if (theNewVersion == null) {
                     serviceVersionNewMap.put(service, version)
-                }else {
-                    if(Integer.valueOf(version) > Integer.valueOf(theNewVersion)){
+                } else {
+                    if (Integer.valueOf(version) > Integer.valueOf(theNewVersion)) {
                         serviceVersionNewMap.put(service, version)
                     }
                 }
-                if(theVersionList == null){
+                if (theVersionList == null) {
                     theVersionList = new ArrayList()
                     serviceVersionMap.put(service, theVersionList)
                 }
@@ -132,7 +224,7 @@ class DeployController {
         }
         List firstChildList = new ArrayList()
         serviceMap.put("children", firstChildList)
-        for (String service : serviceVersionMap.keySet()){
+        for (String service : serviceVersionMap.keySet()) {
             Map secondMap = new HashMap()
             secondMap.put("value", service)
             secondMap.put("label", service)
@@ -150,47 +242,46 @@ class DeployController {
         }
         return serviceMap
     }
-    private Map getServiceVersions(){
-        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
+
+    private Map getServiceVersions() {
+        List<DeployServiceVersion> serviceVersions = deployServiceVersionService.getServiceVersionsAll()
         Map serviceVersionMap = new HashMap()
         serviceVersionMap.put("value", "serverType")
         serviceVersionMap.put("label", "serverType")
         Map serverTypeMap = new HashMap()
-        for (ServiceVersion serviceVersion : serviceVersions){
-            List serverTypes = serviceVersion.getServerType()
-            for (String serverType : serverTypes){
-                Map theServerTypeMap = serverTypeMap.get(serverType)
-                if(theServerTypeMap == null){
-                    theServerTypeMap = new HashMap()
-                    serverTypeMap.put(serverType, theServerTypeMap)
-                }
-                Map theTypeMap = theServerTypeMap.get(serverType)
-                if(theTypeMap == null){
-                    theTypeMap = new HashMap()
-                    theServerTypeMap.put(serviceVersion.type, theTypeMap)
-                }
-                Map allServiceVersionMap = serviceVersion.serviceVersions
-                for (String service : allServiceVersionMap.keySet()){
-                    String theVersion = theTypeMap.get(service)
-                    if(theVersion == null){
-                        theTypeMap.put(service, allServiceVersionMap.get(service))
-                    }else {
-                        theTypeMap.put(service, theVersion + "," + allServiceVersionMap.get(service))
-                    }
+        for (DeployServiceVersion serviceVersion : serviceVersions) {
+            String serverType = serviceVersion.getServerType()
+            Map theServerTypeMap = serverTypeMap.get(serverType)
+            if (theServerTypeMap == null) {
+                theServerTypeMap = new HashMap()
+                serverTypeMap.put(serverType, theServerTypeMap)
+            }
+            Map theTypeMap = theServerTypeMap.get(serverType)
+            if (theTypeMap == null) {
+                theTypeMap = new HashMap()
+                theServerTypeMap.put(serviceVersion.type, theTypeMap)
+            }
+            Map allServiceVersionMap = serviceVersion.serviceVersions
+            for (String service : allServiceVersionMap.keySet()) {
+                String theVersion = theTypeMap.get(service)
+                if (theVersion == null) {
+                    theTypeMap.put(service, allServiceVersionMap.get(service))
+                } else {
+                    theTypeMap.put(service, theVersion + "," + allServiceVersionMap.get(service))
                 }
             }
         }
         List firstChildList = new ArrayList()
         serviceVersionMap.put("children", firstChildList)
-        for (String serverType : serverTypeMap.keySet()){
+        for (String serverType : serverTypeMap.keySet()) {
             Map secondChildMap = new HashMap()
-            secondChildMap.put("value",serverType)
-            secondChildMap.put("label",serverType)
+            secondChildMap.put("value", serverType)
+            secondChildMap.put("label", serverType)
             firstChildList.add(secondChildMap)
             Map theTypeMap = serverTypeMap.get(serverType)
             List secondCildList = new ArrayList()
             secondChildMap.put("children", secondCildList)
-            for (String type : theTypeMap.keySet()){
+            for (String type : theTypeMap.keySet()) {
                 Map thirdChildMap = new HashMap()
                 thirdChildMap.put("value", type)
                 thirdChildMap.put("label", type)
@@ -209,6 +300,7 @@ class DeployController {
         }
         return serviceVersionMap
     }
+
     @PostMapping("/serverconfig")
     def addConfig(@RequestBody Document config) {
         Document configFinal = new Document()
@@ -219,7 +311,7 @@ class DeployController {
                     if (map.get("key").equals("_id")) {
                         String serviceVersion = map.get("value")
                         map.put("value", serviceVersion.toLowerCase())
-                        if (!serviceVersion.toLowerCase().contains(SERVICE_VERSION_SYMBOL)) {
+                        if (!serviceVersion.toLowerCase().contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
                             throw new GeneralException(5000, "_id's value must contains _v")
                         }
                     }
@@ -232,6 +324,13 @@ class DeployController {
         if (!configFinal.isEmpty()) {
             serversService.deleteServerConfig(new Document().append("_id", configFinal.get("_id")))
             serversService.addServerConfig(configFinal)
+            String serviceVersion = configFinal.get("_id")
+            if (!serviceVersion.contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
+                throw new CoreException(Errors.ERROR_PARAMS_ILLEGAL, "Config's _id must contains '_' ,serviceVersion: ${serviceVersion}")
+            }
+            String service = serviceVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[0]
+            String version = serviceVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[1]
+            deployServiceVersionService.updateTheServiceVersion(service, version)
         }
     }
 
@@ -244,9 +343,9 @@ class DeployController {
                     Map<String, String> map = config.get(key)
                     if (map.get("key").equals("_id")) {
                         String serviceVersion = map.get("value")
-                        if (serviceVersion.contains(SERVICE_VERSION_SYMBOL)) {
-                            String[] strings = serviceVersion.split(SERVICE_VERSION_SYMBOL)
-                            String oldServiceVersion = strings[0] + (strings[1].equals("1") ? "" : (SERVICE_VERSION_SYMBOL + (Integer.valueOf(strings[1]) - 1).toString()))
+                        if (serviceVersion.contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
+                            String[] strings = serviceVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)
+                            String oldServiceVersion = strings[0] + (strings[1].equals("1") ? "" : (CommonStants.SERVICE_VERSION_SYMBOL + (Integer.valueOf(strings[1]) - 1).toString()))
                             if (serversService.getServerConfig(oldServiceVersion) != null) {
                                 configFinal = serversService.getServerConfig(oldServiceVersion)
                             }
@@ -263,12 +362,19 @@ class DeployController {
         if (!configFinal.isEmpty()) {
             serversService.deleteServerConfig(new Document().append("_id", configFinal.get("_id")))
             serversService.addServerConfig(configFinal)
+            String serviceVersion = configFinal.get("_id")
+            if (!serviceVersion.contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
+                throw new CoreException(Errors.ERROR_PARAMS_ILLEGAL, "Config's _id must contains '_' ,serviceVersion: ${serviceVersion}")
+            }
+            String service = serviceVersion.split("_")[0]
+            String version = serviceVersion.split("_")[1]
+            deployServiceVersionService.updateTheServiceVersion(service, version)
         }
     }
 
     @GetMapping("/serviceconfig/{service}/{version}")
     def getServiceConfigs(@PathVariable String service, @PathVariable Integer version) {
-        String serviceVersion = service + SERVICE_VERSION_SYMBOL + version
+        String serviceVersion = service + CommonStants.SERVICE_VERSION_SYMBOL + version
         Map mapInternal = null
         Document document = serversService.getServerConfig(serviceVersion)
         Map map = new ConcurrentSkipListMap(new MyComparator())
@@ -284,14 +390,14 @@ class DeployController {
     @GetMapping("/serverconfig")
     def getConfigServicersion(@RequestParam(required = false, name = "s") String searchInput) {
         List searchServies = new ArrayList()
-        if(StringUtils.isNotBlank(searchInput) && searchInput != "undefined"){
+        if (StringUtils.isNotBlank(searchInput) && searchInput != "undefined") {
             Map serverTypeMap = getServiceVresions()
-            for (String serverType : serverTypeMap.keySet()){
-                if(serverType.contains(searchInput)){
+            for (String serverType : serverTypeMap.keySet()) {
+                if (serverType.contains(searchInput)) {
                     Map theTypeMap = serverTypeMap.get(serverType)
-                    for (String type : theTypeMap.keySet()){
+                    for (String type : theTypeMap.keySet()) {
                         Map theServiceMap = theTypeMap.get(type)
-                        for (String service : theServiceMap.keySet()){
+                        for (String service : theServiceMap.keySet()) {
                             searchServies.add(service)
                         }
                     }
@@ -303,7 +409,7 @@ class DeployController {
         for (Document document : configs) {
             String serviceVersion = document.get("_id")
             if (serviceVersion != null) {
-                String[] serviceVersionArray = serviceVersion.split(SERVICE_VERSION_SYMBOL)
+                String[] serviceVersionArray = serviceVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)
                 String service = serviceVersionArray[0]
                 String version = serviceVersionArray[1]
                 List<Integer> serviceVersionList = serviceVersionMap.get(service)
@@ -316,8 +422,8 @@ class DeployController {
         }
         List list = new ArrayList()
         for (String service : serviceVersionMap.keySet()) {
-            if(StringUtils.isNotBlank(searchInput) && searchInput != "undefined"){
-                if(!service.contains(searchInput) && !searchServies.contains(service)){
+            if (StringUtils.isNotBlank(searchInput) && searchInput != "undefined") {
+                if (!service.contains(searchInput) && !searchServies.contains(service)) {
                     continue
                 }
             }
@@ -342,7 +448,7 @@ class DeployController {
             serviceMap.put("children", children)
         }
         List downList = new ArrayList()
-        if(StringUtils.isBlank(searchInput) || searchInput == "undefined"){
+        if (StringUtils.isBlank(searchInput) || searchInput == "undefined") {
             downList.add(getServiceVersions())
             downList.add(getServices())
         }
@@ -353,55 +459,55 @@ class DeployController {
     def deleteConfig(@PathVariable String serviceName) {
         return serversService.deleteServerConfig((new Document().append("_id", serviceName)))
     }
+
     private Map getServiceVresions() {
-        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
+        List<DeployServiceVersion> serviceVersions = deployServiceVersionService.getServiceVersionsAll()
         Map serverTypeMap = new HashMap()
-        for (ServiceVersion serviceVersion : serviceVersions) {
-            List serverTypes = serviceVersion.getServerType()
-            for (String serverType : serverTypes) {
-                Map theServerTypeMap = serverTypeMap.get(serverType)
-                if (theServerTypeMap == null) {
-                    theServerTypeMap = new HashMap()
-                    serverTypeMap.put(serverType, theServerTypeMap)
+        for (DeployServiceVersion serviceVersion : serviceVersions) {
+            String serverType = serviceVersion.getServerType()
+            Map theServerTypeMap = serverTypeMap.get(serverType)
+            if (theServerTypeMap == null) {
+                theServerTypeMap = new HashMap()
+                serverTypeMap.put(serverType, theServerTypeMap)
+            }
+            Map theTypeMap = theServerTypeMap.get(serverType)
+            if (theTypeMap == null) {
+                theTypeMap = new HashMap()
+                theServerTypeMap.put(serviceVersion.type, theTypeMap)
+            }
+            Map allServiceVersionMap = serviceVersion.serviceVersions
+            for (String service : allServiceVersionMap.keySet()) {
+                List theVersionList = theTypeMap.get(service)
+                if (theVersionList == null) {
+                    theVersionList = new ArrayList()
+                    theTypeMap.put(service, theVersionList)
                 }
-                Map theTypeMap = theServerTypeMap.get(serverType)
-                if (theTypeMap == null) {
-                    theTypeMap = new HashMap()
-                    theServerTypeMap.put(serviceVersion.type, theTypeMap)
-                }
-                Map allServiceVersionMap = serviceVersion.serviceVersions
-                for (String service : allServiceVersionMap.keySet()) {
-                    List theVersionList = theTypeMap.get(service)
-                    if (theVersionList == null) {
-                        theVersionList = new ArrayList()
-                        theTypeMap.put(service, theVersionList)
-                    }
-                    if (!theVersionList.contains(serviceVersion.serviceVersions.get(service))) {
-                        theVersionList.add(serviceVersion.serviceVersions.get(service))
-                    }
+                if (!theVersionList.contains(serviceVersion.serviceVersions.get(service))) {
+                    theVersionList.add(serviceVersion.serviceVersions.get(service))
                 }
             }
         }
         return serverTypeMap
     }
+
     @GetMapping("/groovyzips")
     def getGroovyZips(@RequestParam(required = false, name = "s") String searchInput) {
         List searchServies = new ArrayList()
-        if(StringUtils.isNotBlank(searchInput) && searchInput != "undefined"){
+        if (StringUtils.isNotBlank(searchInput) && searchInput != "undefined") {
             Map serverTypeMap = getServiceVresions()
-            for (String serverType : serverTypeMap.keySet()){
-                if(serverType.contains(searchInput)){
+            for (String serverType : serverTypeMap.keySet()) {
+                if (serverType.contains(searchInput)) {
                     Map theTypeMap = serverTypeMap.get(serverType)
-                    for (String type : theTypeMap.keySet()){
+                    for (String type : theTypeMap.keySet()) {
                         Map theServiceMap = theTypeMap.get(type)
-                        for (String service : theServiceMap.keySet()){
+                        for (String service : theServiceMap.keySet()) {
                             searchServies.add(service)
                         }
                     }
                 }
             }
         }
-        List<FileAdapter.FileEntity> fileEntities = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx("/"), null, true)
+        List<FileAdapter.FileEntity> fileEntities = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx(applicationConfig.scriptRemotePath), null, true)
         if (fileEntities != null && fileEntities.size() > 0) {
             Map<String, Map<String, String>> serviceMap = new HashMap<>()
             for (FileAdapter.FileEntity fileEntity : fileEntities) {
@@ -436,8 +542,8 @@ class DeployController {
             List outList = new ArrayList()
             List interalList = null
             for (String serviceName : serviceMap.keySet()) {
-                if(StringUtils.isNotBlank(searchInput) && searchInput != "undefined"){
-                    if(!serviceName.contains(searchInput) && !searchServies.contains(serviceName)){
+                if (StringUtils.isNotBlank(searchInput) && searchInput != "undefined") {
+                    if (!serviceName.contains(searchInput) && !searchServies.contains(serviceName)) {
                         continue
                     }
                 }
@@ -476,7 +582,7 @@ class DeployController {
                 }
             }
             List downList = new ArrayList()
-            if(StringUtils.isBlank(searchInput) || searchInput == "undefined"){
+            if (StringUtils.isBlank(searchInput) || searchInput == "undefined") {
                 downList.add(getServiceVersions())
                 downList.add(getServices())
             }
@@ -514,105 +620,88 @@ class DeployController {
         }
     }
 
-    @GetMapping("/serviceversions")
-    def getAllServiceVersions() {
-        List<ServiceVersion> serviceVersions = serviceVersionService.getServiceVersionsAll()
+    @GetMapping("/deployserviceversions")
+    def getAllDeployServiceVersions() {
+        Map serverTypeMap = serverTypeManager.getServerTypeMap()
         List<Map> list = new ArrayList<>()
-        Map<String, Map<String, String>> serviceVersionsMap = null
-        Map map = null
-        for (ServiceVersion serviceVersion : serviceVersions) {
-            map = new ConcurrentHashMap()
-            List serverTypes = serviceVersion.getServerType()
-            String serverTypesStr = ""
-            for (int i = 0; i < serverTypes.size(); i++) {
-                if (i == serverTypes.size() - 1) {
-                    serverTypesStr = serverTypesStr + serverTypes.get(i)
-                } else {
-                    serverTypesStr = serverTypesStr + serverTypes.get(i) + ","
-                }
-            }
-            map.put("serverType", serverTypesStr)
-            map.put("type", serviceVersion.type)
-            map.put("_id", serviceVersion._id)
-            serviceVersionsMap = new ConcurrentHashMap<>()
-            if (serviceVersion.serviceVersions != null) {
-                Map<String, String> serviceVersionMap = null
-
-                Map keyValueMap = null
-                for (String service : serviceVersion.serviceVersions.keySet()) {
-                    keyValueMap = new HashMap()
-                    serviceVersionMap = new ConcurrentHashMap<>()
-                    if (StringUtils.isEmpty((String) serviceVersion.serviceVersions.get(service))) {
-                        keyValueMap.put("key", service)
-                        keyValueMap.put("value", "0")
-                    } else {
-                        keyValueMap.put("key", service)
-                        keyValueMap.put("value", serviceVersion.serviceVersions.get(service))
-                    }
-                    serviceVersionsMap.put(service, keyValueMap)
-                }
-                if (serviceVersionsMap.size() > 0) {
-                    map.put("serviceVersions", serviceVersionsMap)
-                    map.put("serviceLength", serviceVersionsMap.size())
-                }
+        for (String serverType : serverTypeMap.keySet()) {
+            Map map = new HashMap()
+            ServerType serverTypeData = serverTypeMap.get(serverType)
+            map.put("serverType", serverType)
+            map.put("groovyCloudType", ServerType.getGroovyTypeStr(serverTypeData.getGroovyCloudType()))
+            DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
+            if (deployServiceVersion != null) {
+                map.put("serviceLength", deployServiceVersion.getServiceVersions() == null ? 0 : deployServiceVersion.getServiceVersions().size())
+                map.put("baseJarLength", deployServiceVersion.getBaseJarVersions() == null ? 0 : deployServiceVersion.getBaseJarVersions().size())
             } else {
                 map.put("serviceLength", 0)
+                map.put("baseJarLength", 0)
             }
             list.add(map)
         }
         return list
     }
 
-    @PostMapping("/serviceversion")
-    def addServiceVersion(@RequestBody Map serviceVersionMap) {
-        ServiceVersion serviceVersion = new ServiceVersion()
-        if (!StringUtils.isEmpty((String) serviceVersionMap.get("_id"))) {
-            serviceVersion._id = (String) serviceVersionMap.get("_id").replaceAll(" ", "")
-        }
-        if (!StringUtils.isEmpty((String) serviceVersionMap.get("type"))) {
-            serviceVersion.type = (String) serviceVersionMap.get("type").replaceAll(" ", "")
-        }
-        if (!StringUtils.isEmpty((String) serviceVersionMap.get("serverType"))) {
-            String serverType = (String) serviceVersionMap.get("serverType").replaceAll(" ", "")
-            List<String> serverTypes = Arrays.asList(serverType.split(","))
-            if (serverTypes != null && serverTypes.size() > 0) {
-                serviceVersion.serverType = serverTypes
-            }
-        }
-        Map serviceVersions = (Map) serviceVersionMap.get("serviceVersions")
-        Document serviceVersionFinal = new Document()
-        if (serviceVersions != null && serviceVersions.size() > 0) {
-            for (String service : serviceVersions.keySet()) {
-                Map serviceVersionMap1 = serviceVersions.get(service)
-                if (serviceVersionMap1 != null && serviceVersionMap1.size() > 0) {
-                    if (!StringUtils.isEmpty(serviceVersionMap1.get("key")) && !StringUtils.isEmpty(serviceVersionMap1.get("value"))) {
-                        if (serviceVersionMap1.get("value").equals("0")) {
-                            serviceVersionFinal.append(serviceVersionMap1.get("key").replaceAll(" ", ""), "")
-                        } else {
-                            serviceVersionFinal.append(serviceVersionMap1.get("key").replaceAll(" ", ""), serviceVersionMap1.get("value").replaceAll(" ", ""))
-                        }
-                    }
+    @GetMapping("/deployserviceversions/services/{serverType}")
+    def getDeployServices(@PathVariable String serverType) {
+        DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
+        if (deployServiceVersion != null) {
+            if (deployServiceVersion.serviceVersions != null && !deployServiceVersion.serviceVersions.isEmpty()) {
+                List<Map> list = new ArrayList<>()
+                for (String service : deployServiceVersion.serviceVersions.keySet()) {
+                    Map map = new HashMap()
+                    map.put("service", service)
+                    map.put("version", deployServiceVersion.serviceVersions.get(service))
+                    list.add(map)
                 }
+                return ["serviceVersions": list, "serverType": deployServiceVersion.getServerType()]
             }
         }
-        if (serviceVersionFinal.size() > 0) {
-            serviceVersion.serviceVersions = serviceVersionFinal
-        }
-        serviceVersionService.addServiceVersion(serviceVersion)
+        return ["serverType": serverType]
     }
 
-    @DeleteMapping("/serviceversion")
-    def deleteServiceVersion(@RequestParam(value = "i") String id) {
-        if (!StringUtils.isEmpty(id)) {
-            serviceVersionService.deleteServiceVersion(new Document().append("_id", id))
+    @PostMapping("/deployserviceversions/services/{serverType}/service/{serviceName}")
+    def addDeployService(@PathVariable String serverType, @PathVariable String serviceName) {
+        DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
+        if (deployServiceVersion == null) {
+            throw new GeneralException(Errors.ERROR_CANTFIND_DEPLOYSERVICEVERSION, "Cant find deployServiceVersion, serverType: ${serverType}")
         }
+        if (deployServiceVersion.serviceVersions != null && deployServiceVersion.serviceVersions.containsKey(serviceName)) {
+            throw new GeneralException(Errors.ERROR_SERVICENAME_EXIST, "The deployServiceVersion contains ${serviceName}")
+        }
+        List<String> versions = groovyZipManager.getServiceVersions(serviceName)
+        String maxVersion = "-1"
+        if (versions != null && !versions.isEmpty()) {
+            maxVersion = versions.get(versions.size() - 1)
+        }
+        deployServiceVersionService.addService(serverType, serviceName, maxVersion)
+        return getDeployServices(serverType)
+    }
+
+    @DeleteMapping("/deployserviceversions/services/{serverType}/service/{serviceName}")
+    def delDeployService(@PathVariable String serverType, @PathVariable String serviceName) {
+        DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
+        if (deployServiceVersion == null) {
+            throw new GeneralException(Errors.ERROR_CANTFIND_DEPLOYSERVICEVERSION, "Cant find deployServiceVersion, serverType: ${serverType}")
+        }
+        deployServiceVersionService.deleteService(serverType, serviceName)
+        return getDeployServices(serverType)
+    }
+
+    @DeleteMapping("/deployserviceversion")
+    def deleteServiceVersion(@RequestParam(value = "i") String id) {
+        if (!StringUtils.isNotBlank(id)) {
+            deployServiceVersionService.deleteServiceVersion(id)
+            return getAllDeployServiceVersions()
+        }
+        return null
     }
 
     @GetMapping("allnginx")
     def getAllNginx() {
         List nginxList = new ArrayList()
         Map map = null
-        for (String nginxName : nginxConfig.getNginxMap().keySet()) {
+        for (String nginxName : nginxManager.getNginxNames()) {
             map = new HashMap()
             map.put("value", nginxName)
             nginxList.add(map)
@@ -624,161 +713,41 @@ class DeployController {
     @GetMapping("/webs/{nginxName}")
     def getWebs(@PathVariable String nginxName) {
         if (StringUtils.isNotBlank(nginxName)) {
-            Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-            if (theNginxMap != null) {
-                ShellClient sshClient = new ShellClient(theNginxMap.get("ip"), theNginxMap.get("account"), theNginxMap.get("passwd"), Integer.valueOf(theNginxMap.get("port")))
-                List webFilenames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath"))
-                List webFileList = new ArrayList()
-                Map webFileMap
-                if (webFilenames != null && !webFilenames.isEmpty()) {
-                    List webFilenameList = new ArrayList()
-                    Map webFileNameMap
-                    for (String webFileName : webFilenames) {
-                        webFileNameMap = new HashMap()
-                        List projectFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + webFileName)
-                        if (projectFileNames != null && !projectFileNames.isEmpty()) {
-                            Map projectFileNameMap
-                            List projectFileNameList = new ArrayList()
-                            for (String projectFileName : projectFileNames) {
-                                projectFileNameMap = new HashMap()
-                                List projectFileNameVersions = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + webFileName + "/" + projectFileName)
-                                Map projectFileNameVersionsMap = new HashMap()
-                                if (projectFileNameVersions != null && !projectFileNameVersions.isEmpty()) {
-                                    List projectFileNameVersionList = sortWebVersion(projectFileNameVersions)
-                                    projectFileNameMap.put("projectName", projectFileName)
-                                    projectFileNameMap.put("versions", projectFileNameVersionList)
-                                }
-                                projectFileNameList.add(projectFileNameMap)
-                            }
-                            if (projectFileNameMap != null && !projectFileNameMap.isEmpty()) {
-                                webFileNameMap.put("webName", webFileName)
-                                webFileNameMap.put("projectNames", projectFileNameList)
-                            }
-                        }
-                        if (!webFileNameMap.isEmpty()) {
-                            webFilenameList.add(webFileNameMap)
-                        }
-                    }
-                    if (!webFilenameList.isEmpty()) {
-                        return webFilenameList
-                    }
-                }
-            } else {
-                throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
-            }
+            return webVersionManager.getWebList(nginxName)
         }
     }
 
     @DeleteMapping("/web/{nginxName}/{webName}/{projectName}/{version}")
     def deleteWeb(@PathVariable String nginxName, @PathVariable String webName, @PathVariable String projectName, @PathVariable String version) {
-        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-        if (theNginxMap != null) {
-            String nginxAccount = theNginxMap.get("account")
-            String nginxPort = theNginxMap.get("port")
-            String nginxPasswd = theNginxMap.get("passwd")
-            String nginxIp = theNginxMap.get("ip")
-            String wwwPath = theNginxMap.get("webPath")
-            String projectPath = wwwPath + "/" + webName + "/" + projectName
-            ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-            sshClient.excuteCommand("sudo rm -rf " + projectPath + "/" + version)
-        } else {
-            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
-        }
+        webVersionManager.deleteWebVersion(nginxName, webName, projectName, version)
     }
 
     @GetMapping("/serverweb/{nginxName}")
     def getServerWeb(@PathVariable String nginxName) {
-        Map serverWebMap = new HashMap()
-        Map nginxServerServices = redisTemplate.opsForHash().get("SERVICEWEBS", "SERVICEWEBS".hashCode())
-        Map serverServices = null
-        if (nginxServerServices != null) {
-            serverServices = nginxServerServices.get(nginxName)
-        }
-        if (serverServices != null && serverServices.size() > 0) {
-            List servers = new ArrayList()
-            List versions = null
-            Map serverServiceMap = null
-            for (String serverService : serverServices.keySet()) {
-                List<FileAdapter.FileEntity> fileEntities = fileAdapter.getFilesInDirectory(new FileAdapter.PathEx(applicationConfig.scriptRemotePath + serverService + "_v"), null, true)
-                if (fileEntities != null && fileEntities.size() > 0) {
-                    versions = new ArrayList()
-                    serverServiceMap = new HashMap()
-                    for (FileAdapter.FileEntity fileEntity : fileEntities) {
-                        String absolutePath = fileEntity.absolutePath
-                        if (absolutePath != null) {
-                            String[] serviceVersions = absolutePath.split("/")
-                            String serviceVersion;
-                            if (StringUtils.isEmpty(serviceVersions[0])) {
-                                serviceVersion = serviceVersions[2]
-                            } else {
-                                serviceVersion = serviceVersions[1]
-                            }
-                            String version = null
-                            if (serviceVersion.split("_v").length > 1) {
-                                version = serviceVersion.split("_v")[1]
-                            }
-                            if (version != null && !versions.contains(version)) {
-                                versions.add(Integer.valueOf(version))
-                            }
-                        }
+        List webList = webVersionManager.getWebList(nginxName)
+        if (webList != null) {
+            List finalList = new ArrayList()
+            for (Map map : webList) {
+                String webName = map.get("webName")
+                List projectNames = map.get("projectNames")
+                for (Map projectMap : projectNames) {
+                    Map finalProjectMap = new HashMap()
+                    String projectName = projectMap.get("projectName")
+                    List versions = projectMap.get("versions")
+                    finalProjectMap.put("webName", webName)
+                    finalProjectMap.put("projectName", projectName)
+                    finalProjectMap.put("versions", versions)
+//                    finalProjectMap.put("projectNames", projectNames)
+                    Map currentVersions = webVersionManager.getCurrentWebVersions()
+                    if (currentVersions != null) {
+                        finalProjectMap.put("currentVersion", currentVersions.get(webName + "#" + projectName))
                     }
-                    if (versions.size() > 0) {
-                        Collections.reverse(versions)
-                        serverServiceMap.put("serviceName", serverService)
-                        if (serverServices.get(serverService) != null && serverServices.size() > 0) {
-                            serverServiceMap.put("currentVersion", Integer.valueOf(serverServices.get(serverService)))
-                        }
-                        serverServiceMap.put("versions", versions)
-                        servers.add(serverServiceMap)
-                    }
+                    finalList.add(finalProjectMap)
                 }
             }
-            if (servers.size() > 0) {
-                serverWebMap.put("servers", servers)
-            }
+            return finalList
         }
-        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-        if (theNginxMap != null) {
-            String nginxAccount = theNginxMap.get("account")
-            String nginxPort = theNginxMap.get("port")
-            String nginxPasswd = theNginxMap.get("passwd")
-            String nginxIp = theNginxMap.get("ip")
-            ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-            List firstFilenames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath"))
-            List webFileList = new ArrayList()
-            List webFiles = null
-            Map webFileMap = null
-            if (firstFilenames != null && firstFilenames.size() > 0) {
-                //tc這一層
-                for (String firstFileName : firstFilenames) {
-                    List secondFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + firstFileName)
-                    if (secondFileNames != null && secondFileNames.size() > 0) {
-                        Map projectMap
-                        for (String secondFileName : secondFileNames) {
-                            projectMap = new HashMap()
-                            projectMap.put("webName", firstFileName)
-                            projectMap.put("projectName", secondFileName)
-                            if (serverServices != null) {
-                                if (serverServices.get(firstFileName + "#" + secondFileName) != null) {
-                                    projectMap.put("currentVersion", serverServices.get(firstFileName + "#" + secondFileName))
-                                }
-                            }
-                            List thirdFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + firstFileName + "/" + secondFileName)
-                            if (thirdFileNames != null && !thirdFileNames.isEmpty()) {
-                                projectMap.put("versions", sortWebVersion(thirdFileNames))
-                            }
-                            webFileList.add(projectMap)
-                        }
-                    }
-                }
-                if (webFileList.size() > 0) {
-                    serverWebMap.put("webs", webFileList)
-                }
-            }
-            return serverWebMap
-        } else {
-            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
-        }
+        return null
     }
 
     @GetMapping("/serverweb/server/{serviceName}")
@@ -814,140 +783,87 @@ class DeployController {
 
     @GetMapping("/serverweb/web/{nginxName}/{webName}/{projectName}")
     def getWebVersionsByWebName(@PathVariable String nginxName, @PathVariable String webName, @PathVariable String projectName) {
-        Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-        if (theNginxMap != null) {
-            String nginxAccount = theNginxMap.get("account")
-            String nginxPort = theNginxMap.get("port")
-            String nginxPasswd = theNginxMap.get("passwd")
-            String nginxIp = theNginxMap.get("ip")
-            ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-            List secondFileNames = sshClient.excuteCommand("sudo ls " + theNginxMap.get("webPath") + "/" + webName + "/" + projectName)
-            if (secondFileNames != null && secondFileNames.size() > 0) {
-                secondFileNames = sortWebVersion(secondFileNames)
-                return secondFileNames
+        List list = webVersionManager.getWebList(nginxName)
+        if (list != null) {
+            for (Map map : list) {
+                if (map.get("webName").equals(webName)) {
+                    List projectlist = map.get("projectNames")
+                    if (projectlist != null) {
+                        for (Map projectMap : projectlist) {
+                            if (projectMap.get("projectName").equals(projectName)) {
+                                return projectMap.get("versions")
+                            }
+                        }
+                    }
+                }
             }
-        } else {
-            throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
         }
+        return null
     }
 
     @PostMapping("/serverweb")
     def reloadNginx(@RequestBody Map map) {
         String nginxName = map.get("nginxName")
         if (!StringUtils.isEmpty(nginxName)) {
-            Map theNginxMap = nginxConfig.getNginxMap().get(nginxName)
-            if (theNginxMap != null) {
-                String nginxAccount = theNginxMap.get("account")
-                String nginxPort = theNginxMap.get("port")
-                String nginxPasswd = theNginxMap.get("passwd")
-                String nginxIp = theNginxMap.get("ip")
-                SftpClient sftpClient = new SftpClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                sftpClient.download(theNginxMap.get("nginxRemotePath"), "nginx.conf", applicationConfig.nginxPath + "nginx.conf")
-                LoggerEx.info("DeployController", "Download nginx.conf success,path: " + applicationConfig.nginxPath + "nginx.conf")
-                if (map != null && map.size() > 0) {
-                    Map serverServices = new HashMap()
-                    String originPath = applicationConfig.nginxPath + nginxFileName
-                    String nginxContent = FileUtils.readFileToString(new File(originPath), "utf8")
-                    // replace html path
-                    List<Map> webs = map.get("webs")
-                    if (webs != null) {
-                        for (Map webMap : webs) {
-                            String webName = webMap.get("webName")
-                            String projectName = webMap.get("projectName")
-                            String currentVersion = null
-                            if (webMap.get("currentVersion") != null) {
-                                currentVersion = webMap.get("currentVersion").toString()
-                            }
-                            if (!StringUtils.isEmpty(webName) && !StringUtils.isEmpty(currentVersion) && !StringUtils.isEmpty(projectName)) {
-                                String originalPre = theNginxMap.get("webPath") + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/"
-                                String replacePath = theNginxMap.get("webPath") + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/" + currentVersion.replaceAll(" ", "")
-                                Pattern pattern = Pattern.compile(originalPre + "\\d{4}_\\d{2}_\\d{2}_\\d{2}_\\d{2}_\\d{2}")
-                                Matcher matcher = pattern.matcher(nginxContent)
-                                nginxContent = matcher.replaceAll(replacePath)
-                                serverServices.put(webName + "#" + projectName, currentVersion)
-                            }
+            List<Map> webs = map.get("webs")
+            if (webs != null) {
+                synchronized (nginxManager.getLock(nginxName)) {
+                    Map webVersions = new HashMap()
+                    def returnResult = nginxManager.getNginxContent(nginxName)
+                    if (returnResult != null) {
+                        String msg = returnResult["message"]
+                        if (msg != null) {
+                            throw new GeneralException(5000, msg)
                         }
                     }
-                    // replace server version
-                    List<Map> servers = map.get("servers")
-                    if (servers != null) {
-                        for (Map serverMap : servers) {
-                            String serviceName = serverMap.get("serviceName")
-                            String currentVersion = null
-                            if (serverMap.get("currentVersion") != null) {
-                                currentVersion = serverMap.get("currentVersion").toString()
-                            }
-                            if (!StringUtils.isEmpty(serviceName) && !StringUtils.isEmpty(currentVersion)) {
-                                String originalPre = serviceName.replaceAll(" ", "") + "_v"
-                                String replacePath = serviceName.replaceAll(" ", "") + "_v" + currentVersion.replaceAll(" ", "")
-                                int index = nginxContent.indexOf(originalPre)
-                                if (index != -1) {
-                                    String oldVersion = ''
-                                    for (int i = 0; i < 4; i++) {
-                                        if (StringUtils.isNumeric(nginxContent.charAt(index + originalPre.size() + i).toString())) {
-                                            oldVersion += nginxContent.charAt(index + originalPre.size() + i).toString()
-                                        } else {
-                                            break
-                                        }
-                                    }
-                                    if (oldVersion != null) {
-                                        nginxContent = nginxContent.replaceAll(originalPre + oldVersion, replacePath)
-                                        serverServices.put(serviceName, currentVersion)
-                                    }
-                                }
-                            }
+                    String nginxContent = returnResult["nginxContent"]
+                    Nginx nginx = nginxManager.getNginx(nginxName)
+                    boolean needReload = false
+                    for (Map webMap : webs) {
+                        String webName = webMap.get("webName")
+                        String projectName = webMap.get("projectName")
+                        String currentVersion = null
+                        if (webMap.get("currentVersion") != null) {
+                            currentVersion = webMap.get("currentVersion").toString()
+                        }
+                        if (StringUtils.isNotBlank(webName) && StringUtils.isNotBlank(currentVersion) && StringUtils.isNotBlank(projectName)) {
+                            needReload = true
+                            String originalPre = nginx.getWebPath() + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/"
+                            String replacePath = nginx.getWebPath() + "/" + webName.replaceAll(" ", "") + "/" + projectName.replaceAll(" ", "") + "/" + currentVersion.replaceAll(" ", "")
+                            Pattern pattern = Pattern.compile(originalPre + "\\d{4}_\\d{2}_\\d{2}_\\d{2}_\\d{2}_\\d{2}")
+                            Matcher matcher = pattern.matcher(nginxContent)
+                            nginxContent = matcher.replaceAll(replacePath)
+                            webVersions.put(webName + "#" + projectName, currentVersion)
                         }
                     }
-                    // write content to temp file
+                    if (!needReload) {
+                        return
+                    }
                     String targetTime = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss") + "target"
-                    def targetDir = originPath + "_" + targetTime
-                    FileUtils.writeStringToFile(new File(targetDir), nginxContent, "utf8")
-                    try {
-                        sftpClient.upload(targetDir, theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime)
-                    } catch (Throwable t) {
-                        LoggerEx.error(TAG, "Upload file failed!!! err: " + t.getMessage())
+                    String result = nginxManager.uploadNginxFile(nginxName, nginxContent, targetTime)
+                    if (result == null) {
+                        List testResult = nginxManager.testNginx(nginxName, targetTime)
+                        boolean testSuccess = false
+                        if (testResult != null) {
+                            if (JSON.toJSONString(testResult).contains("success")) {
+                                testSuccess = true
+                            }
+                        }
+                        if (testSuccess) {
+                            List reloadResult = nginxManager.reloadNginx(nginxName, targetTime)
+                            if (reloadResult == null || !JSON.toJSONString(reloadResult).contains("process started")) {
+                                throw new GeneralException(5000, "Reload nginx failed ${reloadResult}")
+                            }
+                        } else {
+                            throw new GeneralException(5000, "Test nginx failed ${testResult}")
+                        }
+                    } else {
+                        throw new GeneralException(5000, "Upload nginx failed ${result}")
                     }
-                    LoggerEx.info("DeployController", "upload nginx target.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime)
-                    // check nginx config
-                    ShellClient sshClient = new ShellClient(nginxIp, nginxAccount, nginxPasswd, Integer.valueOf(nginxPort))
-                    try {
-                        sshClient.excuteCommand("sudo docker exec nginx nginx -tc $targetDir")
-                    } catch (Throwable t) {
-                        FileUtils.deleteQuietly(new File(targetDir))
-                        sftpClient.close()
-                        LoggerEx.error(TAG, "Manage exec nginx failed!!! error: " + t.getMessage())
-                        throw t
+                    if (!webVersions.isEmpty()) {
+                        webVersionManager.setCurrentVersions(webVersions)
                     }
-////             rename original nginx fileName,   reload file
-                    String nginxBak = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
-                    try {
-                        sshClient.excuteCommand("sudo mv " + theNginxMap.get("nginxRemotePath") + nginxFileName + " " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + nginxBak)
-                        LoggerEx.info("DeployController", "mv old nginx.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + nginxBak)
-                        Thread.sleep(1000)
-                        sshClient.excuteCommand("sudo mv " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime + " " + theNginxMap.get("nginxRemotePath") + nginxFileName)
-                        LoggerEx.info("DeployController", "mv new nginx.conf success,path: " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + targetTime + " to " + theNginxMap.get("nginxRemotePath") + nginxFileName)
-                        sshClient.excuteCommand("sudo docker exec nginx nginx -s reload")
-                        LoggerEx.info(TAG, "sudo docker exec nginx nginx -s reload")
-                    } catch (Throwable t) {
-                        FileUtils.deleteQuietly(new File(originPath))
-                        FileUtils.deleteQuietly(new File(targetDir))
-                        sshClient.excuteCommand("sudo rm -rf " + theNginxMap.get("nginxRemotePath") + nginxFileName)
-                        sshClient.excuteCommand("sudo mv " + theNginxMap.get("nginxRemotePath") + nginxFileName + "_" + nginxBak + " " + theNginxMap.get("nginxRemotePath") + nginxFileName)
-                        sftpClient.close()
-                        LoggerEx.error(TAG, "Manage nginx.conf failed!!! error: " + t.getMessage())
-                        throw t
-                    }
-                    if (serverServices.size() > 0) {
-                        Map nginxServerServices = new HashMap()
-                        nginxServerServices.put(nginxName, serverServices)
-                        redisTemplate.opsForHash().put("SERVICEWEBS", "SERVICEWEBS".hashCode(), nginxServerServices)
-                    }
-                    sftpClient.close()
-                    FileUtils.deleteQuietly(new File(originPath))
-                    FileUtils.deleteQuietly(new File(targetDir))
                 }
-            } else {
-                throw new GeneralException(5000, "Nginx map is empty, nginx: " + nginxName)
             }
         }
     }
@@ -975,42 +891,140 @@ class DeployController {
         return null
     }
 
-    @PostMapping("/container")
-    def reloadContainer(@RequestBody DockerStatus dockerStatus) {
-        if (dockerStatus != null) {
-            if (dockerStatus.server != null && dockerStatus.ip != null && dockerStatus.dockerName != null) {
-                InputStream inStream = DeployController.class.getClassLoader().getResourceAsStream("groovycloud.properties");
-                Properties prop = new Properties();
-                prop.load(inStream)
-                String ip = dockerStatus.ip
-                String address = prop.getProperty(GROOVYCLOUYDSERVERS1 + dockerStatus.ip)
-                if (address != null) {
-                    String[] addresses = address.split(",")
-                    String port = addresses[1]
-                    String account = addresses[2]
-                    String passwd = addresses[3]
-                    if (StringUtils.isEmpty(port)) {
-                        port = "22"
-                    }
-                    if (StringUtils.isEmpty(account)) {
-                        account = ""
-                    }
-                    if (StringUtils.isEmpty(passwd)) {
-                        passwd = ""
-                    }
-                    try {
-                        dockerStatusService.deleteDockerStatus(dockerStatus.server)
-                    } catch (Throwable t) {
-                        LoggerEx.error(TAG, t.getMessage())
-                    }
-                    ShellClient sshClient = new ShellClient(ip, account, passwd, Integer.valueOf(port))
-                    try {
-                        sshClient.excuteCommand("sudo docker restart " + dockerStatus.dockerName)
-                    } catch (Throwable t) {
-                        LoggerEx.error(DeployController.class.getSimpleName(), "Reload container failed!!! err: " + t.message)
-                    }
+    @GetMapping("/container/{serverType}")
+    def reloadContainer(HttpServletRequest request, @PathVariable String serverType) {
+        DeployServiceVersion deployServiceVersion = deployServiceVersionService.getServiceVersion(serverType)
+        if (deployServiceVersion != null) {
+            reloadManager.canLoad(deployServiceVersion.getServerType())
+            String account = RequestUtils.getAccount(request)
+            DeployRecord deployRecord = new DeployRecord()
+            deployRecord.setId(ObjectId.get().toString())
+            deployRecord.setTime(TimeUtils.getDateString(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss,SSS"))
+            deployRecord.setServerType(deployServiceVersion.getServerType())
+            deployRecord.setServiceVersions(deployServiceVersion.getServiceVersions())
+            List ipDockerNames = serverManager.getIPDockerNames(serverType)
+            Map serverMap = null
+            if (ipDockerNames != null && !ipDockerNames.isEmpty()) {
+                serverMap = new HashMap()
+                for (String ipDockerName : ipDockerNames){
+                    serverMap.put(ipDockerName.replaceAll("\\.", "__"), DeployRecord.DEPLOY_SERVER_WAIT)
                 }
             }
+            deployRecord.setDeployIngMap(serverMap)
+            deployRecord.setDeployer(account)
+//            Map updateBaseJarVersions = baseJarManager.getUpdateBaseJarsVersion(deployServiceVersion.getBaseJarVersions())
+//            deployRecord.setUpdateBaseJarVersions(updateBaseJarVersions)
+            deployRecordService.addDeployRecord(deployRecord)
+            deployServiceVersionService.updateServiceVersionDeployId(deployServiceVersion.get_id(), deployRecord.getId())
+            reloadManager.addDeployId(deployRecord.getServerType(), deployRecord.getId())
+        } else {
+            throw new GeneralException(Errors.ERROR_CANTFIND_DEPLOYSERVICEVERSION, "Cant find deployServiceVersion, id: ${deployServiceVersion.get_id()}")
+        }
+    }
+
+    @GetMapping("/deployrecords")
+    def getDeployRecords(@RequestParam(required = false, name = "s") String searchInput) {
+        boolean filter = false
+        if (StringUtils.isNotBlank(searchInput) && searchInput != "undefined") {
+            filter = true
+        }
+        List<DeployRecord> deployRecords = deployRecordService.getDeployRecords()
+        if (deployRecords != null && !deployRecords.isEmpty()) {
+            List list = new ArrayList()
+            for (DeployRecord deployRecord : deployRecords) {
+                boolean execute = true
+                if (filter) {
+                    if (!deployRecord.getServerType().contains(searchInput) && !deployRecord.getDeployer().contains(searchInput)) {
+                        execute = false
+                    }
+                }
+                if (execute) {
+                    Map map = new HashMap()
+                    map.put("id", deployRecord.getId())
+                    map.put("serverType", deployRecord.getServerType())
+                    map.put("deployer", deployRecord.getDeployer())
+                    map.put("time", deployRecord.getTime())
+                    list.add(map)
+                }
+            }
+
+            return list
+        }
+        return null
+    }
+
+    @GetMapping("newbaseJars/{id}")
+    def getUpdateBaseJars(@PathVariable String id) {
+        DeployRecord deployRecord = deployRecordService.getDeployRecord(id)
+        Map result = new HashMap()
+        result.put("id", id)
+        result.put("serverType", deployRecord.getServerType())
+        if (deployRecord != null) {
+            if (deployRecord.getUpdateBaseJarVersions() != null) {
+                List<Map> list = new ArrayList<>()
+                Map normalBaseJars = baseJarManager.convertJarName(deployRecord.getUpdateBaseJarVersions())
+                for (String jarName : normalBaseJars.keySet()) {
+                    Map map = new HashMap()
+                    map.put("jarName", jarName)
+                    map.put("version", TimeUtils.getDateString(normalBaseJars.get(jarName), "yyyyMMddHHmmss"))
+                    if (jarName.contains("container")) {
+                        list.add(0, map)
+                    } else {
+                        list.add(map)
+                    }
+                }
+                if (!list.isEmpty()) {
+                    result.put("baseJarVersions", list)
+                }
+            }
+            return result
+        }
+    }
+
+    @GetMapping("thisserviceversions/{id}")
+    def getTheDeployServiceVersions(@PathVariable String id) {
+        DeployRecord deployRecord = deployRecordService.getDeployRecord(id)
+        Map result = new HashMap()
+        result.put("id", id)
+        result.put("serverType", deployRecord.getServerType())
+        if (deployRecord != null) {
+            if (deployRecord.getServiceVersions() != null) {
+                List<Map> list = new ArrayList<>()
+                for (String serviceName : deployRecord.getServiceVersions().keySet()) {
+                    Map map = new HashMap()
+                    map.put("serviceName", serviceName)
+                    map.put("version", deployRecord.getServiceVersions().get(serviceName))
+                    list.add(map)
+                }
+                if (!list.isEmpty()) {
+                    result.put("serviceVersions", list)
+                }
+            }
+            return result
+        }
+    }
+
+    @GetMapping("deployserver/{id}")
+    def getDeployServer(@PathVariable String id) {
+        DeployRecord deployRecord = deployRecordService.getDeployRecord(id)
+        Map result = new HashMap()
+        result.put("id", id)
+        result.put("serverType", deployRecord.getServerType())
+        if (deployRecord != null) {
+            Map deployInMap = deployRecord.getDeployIngMap()
+            if (deployInMap != null) {
+                List<Map> list = new ArrayList<>()
+                for (String server : deployInMap.keySet()) {
+                    Map map = new HashMap()
+                    map.put("server", server)
+                    map.put("status", deployInMap.get(server))
+                    list.add(map)
+                }
+                if (!list.isEmpty()) {
+                    result.put("deployServers", list)
+                }
+            }
+            return result
         }
     }
 

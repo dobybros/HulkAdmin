@@ -6,4 +6,6 @@ package com.dobybros.hulkadmin.utils
  */
 class CommonStants {
     public final static String internalKey = "FSDdfFDWfR324fs98DSF*@#"
+    public final static String SERVICE_VERSION_SYMBOL = "_v"
+
 }

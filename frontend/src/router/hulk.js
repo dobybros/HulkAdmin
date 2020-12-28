@@ -31,28 +31,22 @@ export default {
             meta: {...meta, title: `Deploy Upload Groovy`}
         },
         {
-            path: `deployserviceversion`,
-            name: `${pre}/deployserviceversion`,
+            path: `deployreloadcontainer`,
+            name: `${pre}/deployreloadcontainer`,
             component: _import('hulk/deployserviceversion/index'),
-            meta: {...meta, title: `Deploy Service Version`}
+            meta: {...meta, title: `Deploy Reload Container`}
+        },
+        {
+            path: `deployrecord`,
+            name: `${pre}/deployrecord`,
+            component: _import('hulk/deployrecord/index'),
+            meta: {...meta, title: `Deploy Records`}
         },
         {
             path: `deployuploadweb`,
             name: `${pre}/deployuploadweb`,
             component: _import('hulk/deployuploadweb/index'),
             meta: {...meta, title: `Deploy Upload Web`}
-        },
-        {
-            path: `deployreloadcontainer`,
-            name: `${pre}/deployreloadcontainer`,
-            component: _import('hulk/deployreloadcontainer/index'),
-            meta: {...meta, title: `Deploy Reload Container`}
-        },
-        {
-            path: `deployreloadnginx`,
-            name: `${pre}/deployreloadnginx`,
-            component: _import('hulk/deployreloadnginx/index'),
-            meta: {...meta, title: `Deploy Reload Nginx`}
         },
         {
             path: `gcMemory`,
@@ -77,6 +71,13 @@ export default {
             name: `${pre}/transactions`,
             component: _import('hulk/transactions/index'),
             meta: {...meta, title: `Transactions`}
+        },
+        {
+            path: `versions`,
+            name: `${pre}/versions`,
+            component: _import('hulk/versions/index'),
+            meta: {...meta, title: `Version Management`}
         }
+
     ])('hulk-admin-')
 }

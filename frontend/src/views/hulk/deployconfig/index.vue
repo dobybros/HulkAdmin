@@ -277,6 +277,7 @@
             uploadSuccess(res, file, fileList) {
                 if (res.code === 1) {
                     this.$message.success("Import config success!")
+                    this.fileList=[]
                 } else {
                     this.$message.error("Import config failed!")
                 }
