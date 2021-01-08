@@ -1,0 +1,13 @@
+(window["webpackJsonp"] = window["webpackJsonp"] || []).push([["chunk-2d0c8f8a"],{
+
+/***/ "56c6":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony default export */ __webpack_exports__["default"] = ("<template>\n  <div>\n    <d2-crud\n      :columns=\"columns\"\n      :data=\"data\"\n      :options=\"options\"/>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      columns: [\n        {\n          title: 'ID',\n          key: 'id'\n        },\n        {\n          title: '\u59D3\u540D',\n          key: 'name'\n        },\n        {\n          title: '\u6570\u503C 1',\n          key: 'amount1'\n        },\n        {\n          title: '\u6570\u503C 2',\n          key: 'amount2'\n        },\n        {\n          title: '\u6570\u503C 3',\n          key: 'amount3'\n        }\n      ],\n      data: [\n        {\n          id: '12987122',\n          name: '\u738B\u5C0F\u864E',\n          amount1: '234',\n          amount2: '3.2',\n          amount3: 10\n        },\n        {\n          id: '12987123',\n          name: '\u738B\u5C0F\u864E',\n          amount1: '165',\n          amount2: '4.43',\n          amount3: 12\n        },\n        {\n          id: '12987124',\n          name: '\u738B\u5C0F\u864E',\n          amount1: '324',\n          amount2: '1.9',\n          amount3: 9\n        },\n        {\n          id: '12987125',\n          name: '\u738B\u5C0F\u864E',\n          amount1: '621',\n          amount2: '2.2',\n          amount3: 17\n        },\n        {\n          id: '12987126',\n          name: '\u738B\u5C0F\u864E',\n          amount1: '539',\n          amount2: '4.1',\n          amount3: 15\n        }\n      ],\n      options: {\n        showSummary: true,\n        summaryMethod (param) {\n          const { columns, data } = param\n          const sums = []\n          columns.forEach((column, index) => {\n            if (index === 0) {\n              sums[index] = '\u603B\u4EF7'\n              return\n            }\n            const values = data.map(item => Number(item[column.property]))\n            if (!values.every(value => isNaN(value))) {\n              sums[index] = values.reduce((prev, curr) => {\n                const value = Number(curr)\n                if (!isNaN(value)) {\n                  return prev + curr\n                } else {\n                  return prev\n                }\n              }, 0)\n              sums[index] += ' \u5143'\n            } else {\n              sums[index] = 'N/A'\n            }\n          })\n\n          return sums\n        }\n      }\n    }\n  }\n}\n</script>");
+
+/***/ })
+
+}]);
+//# sourceMappingURL=chunk-2d0c8f8a.2cab6dec.js.map

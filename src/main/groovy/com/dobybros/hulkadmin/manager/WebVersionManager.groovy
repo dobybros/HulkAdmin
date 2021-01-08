@@ -91,7 +91,7 @@ class WebVersionManager {
         Nginx nginx = nginxManager.getNginx(nginxName)
         String projectPath = nginx.getWebPath() + "/" + webName + "/" + projectName
         String fileName = TimeUtils.getDateString(System.currentTimeMillis(), "yyyy_MM_dd_HH_mm_ss")
-        remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo mkdir -p " + projectPath)
+        remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo mkdir -p " + projectPath + "/" + fileName)
         remoteClientBuilder.buildSftpClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).uploadByStream(projectPath, fileName + ".zip", file.inputStream)
         remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo unzip -d " + projectPath + "/" + fileName + " " + projectPath + "/" + fileName + ".zip")
         remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo rm -rf " + projectPath + "/" + fileName + ".zip")

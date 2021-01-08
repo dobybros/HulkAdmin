@@ -1,0 +1,13 @@
+(window["webpackJsonp"] = window["webpackJsonp"] || []).push([["chunk-746f62b0"],{
+
+/***/ "2d833":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony default export */ __webpack_exports__["default"] = ("<template>\n  <div>\n    <d2-crud\n      :columns=\"columns\"\n      :data=\"data\"\n      :rowHandle=\"rowHandle\"\n      @row-remove=\"handleRowRemove\"/>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      columns: [\n        {\n          title: '\u65E5\u671F',\n          key: 'date'\n        },\n        {\n          title: '\u59D3\u540D',\n          key: 'name'\n        },\n        {\n          title: '\u5730\u5740',\n          key: 'address'\n        }\n      ],\n      data: [\n        {\n          date: '2016-05-02',\n          name: '\u738B\u5C0F\u864E',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1518 \u5F04',\n          forbidRemove: true,\n          showRemoveButton: true\n        },\n        {\n          date: '2016-05-04',\n          name: '\u738B\u5C0F\u864E',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1517 \u5F04',\n          forbidRemove: false,\n          showRemoveButton: true\n        },\n        {\n          date: '2016-05-01',\n          name: '\u738B\u5C0F\u864E',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1519 \u5F04',\n          forbidRemove: false,\n          showRemoveButton: false\n        },\n        {\n          date: '2016-05-03',\n          name: '\u738B\u5C0F\u864E',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1516 \u5F04',\n          forbidRemove: false,\n          showRemoveButton: true\n        }\n      ],\n      rowHandle: {\n        remove: {\n          icon: 'el-icon-delete',\n          size: 'small',\n          fixed: 'right',\n          confirm: true,\n          show (index, row) {\n            if (row.showRemoveButton) {\n              return true\n            }\n            return false\n          },\n          disabled (index, row) {\n            if (row.forbidRemove) {\n              return true\n            }\n            return false\n          }\n        }\n      }\n    }\n  },\n  methods: {\n    handleRowRemove ({ index, row }, done) {\n      setTimeout(() => {\n        console.log(index)\n        console.log(row)\n        this.$message({\n          message: '\u5220\u9664\u6210\u529F',\n          type: 'success'\n        })\n        done()\n      }, 300)\n    }\n  }\n}\n</script>");
+
+/***/ })
+
+}]);
+//# sourceMappingURL=chunk-746f62b0.25c4b67e.js.map

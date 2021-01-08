@@ -1,0 +1,13 @@
+(window["webpackJsonp"] = window["webpackJsonp"] || []).push([["chunk-2d209ade"],{
+
+/***/ "a9a1":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony default export */ __webpack_exports__["default"] = ("<template>\n  <div>\n    <d2-crud\n      :columns=\"columns\"\n      :data=\"data\"/>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    return {\n      columns: [\n        {\n          title: '\u65E5\u671F',\n          key: 'date',\n          width: '180',\n          fixed: true\n        },\n        {\n          title: '\u59D3\u540D',\n          key: 'name',\n          width: '180'\n        },\n        {\n          title: '\u7701\u4EFD',\n          key: 'province',\n          width: '300'\n        },\n        {\n          title: '\u5E02\u533A',\n          key: 'city',\n          width: '300'\n        },\n        {\n          title: '\u5730\u5740',\n          key: 'address',\n          width: '300'\n        },\n        {\n          title: '\u90AE\u7F16',\n          key: 'zip',\n          fixed: 'right'\n        }\n      ],\n      data: [\n        {\n          date: '2016-05-03',\n          name: '\u738B\u5C0F\u864E',\n          province: '\u4E0A\u6D77',\n          city: '\u666E\u9640\u533A',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1518 \u5F04',\n          zip: 200333\n        },\n        {\n          date: '2016-05-02',\n          name: '\u738B\u5C0F\u864E',\n          province: '\u4E0A\u6D77',\n          city: '\u666E\u9640\u533A',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1518 \u5F04',\n          zip: 200333\n        },\n        {\n          date: '2016-05-04',\n          name: '\u738B\u5C0F\u864E',\n          province: '\u4E0A\u6D77',\n          city: '\u666E\u9640\u533A',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1518 \u5F04',\n          zip: 200333\n        },\n        {\n          date: '2016-05-01',\n          name: '\u738B\u5C0F\u864E',\n          province: '\u4E0A\u6D77',\n          city: '\u666E\u9640\u533A',\n          address: '\u4E0A\u6D77\u5E02\u666E\u9640\u533A\u91D1\u6C99\u6C5F\u8DEF 1518 \u5F04',\n          zip: 200333\n        }\n      ]\n    }\n  }\n}\n</script>");
+
+/***/ })
+
+}]);
+//# sourceMappingURL=chunk-2d209ade.e901503b.js.map

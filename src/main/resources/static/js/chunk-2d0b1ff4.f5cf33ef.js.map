@@ -1,0 +1,1 @@
+{"version":3,"sources":["webpack:///./src/views/demo/components/highlight/code/javascript.js"],"names":[],"mappings":";;;;;;AAAA;AAAe,oL","file":"js/chunk-2d0b1ff4.f5cf33ef.js","sourcesContent":["export default `[].forEach.call($$(\"*\"), a => {\n  a.style.outline=\"1px solid #\"+(~~(Math.random()*(1<<24))).toString(16)\n})`\n"],"sourceRoot":""}

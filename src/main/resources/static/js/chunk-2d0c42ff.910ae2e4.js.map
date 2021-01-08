@@ -1,0 +1,1 @@
+{"version":3,"sources":["webpack:///./src/views/demo/components/highlight/code/html.js"],"names":[],"mappings":";;;;;;AAAA;AAAe,mM","file":"js/chunk-2d0c42ff.910ae2e4.js","sourcesContent":["export default `<ul>\n  <li class=\"li-1\"><p>Hello</p></li>\n  <li>\n    <span style=\"color: red;\">\n      Hello\n    </span>\n  </li>\n</ul>`\n"],"sourceRoot":""}

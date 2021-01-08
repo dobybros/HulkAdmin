@@ -1,0 +1,11 @@
+(window["webpackJsonp"] = window["webpackJsonp"] || []).push([["chunk-2d20feb8"],{
+
+/***/ "b64b":
+/***/ (function(module, exports) {
+
+module.exports = "数据结构比较复杂的时候，可使用多级表头来展现数据的层次关系，只需在 `columns` 中使用 `children` 字段对子级表头进行嵌套即可。代码如下：\n"
+
+/***/ })
+
+}]);
+//# sourceMappingURL=chunk-2d20feb8.f22afb67.js.map

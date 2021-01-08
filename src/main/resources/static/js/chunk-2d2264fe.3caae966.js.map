@@ -1,0 +1,1 @@
+{"version":3,"sources":["webpack:///./src/views/demo/components/highlight/code/scss.js"],"names":[],"mappings":";;;;;;AAAA;AAAe,uL","file":"js/chunk-2d2264fe.3caae966.js","sourcesContent":["export default `body {\n  background-color: aliceblue;\n  height: 100%;\n  .my-card {\n    height: 300px;\n    width: 300px;\n  }\n}`\n"],"sourceRoot":""}

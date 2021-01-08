@@ -1,0 +1,1 @@
+{"version":3,"sources":["webpack:///./src/views/demo/components/editor-simpleMDE/text.js"],"names":[],"mappings":";;;;;;AAAA;AAAe,+M","file":"js/chunk-2d213178.1c2b95cb.js","sourcesContent":["export default `# 标题\n\n- 列表\n- 列表\n\n\\`\\`\\`\nalert('Hello')\n\\`\\`\\`\n\n[D2Admin in github](https://github.com/d2-projects/d2-admin)`\n"],"sourceRoot":""}
