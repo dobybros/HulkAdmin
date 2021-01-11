@@ -127,10 +127,11 @@ public class AuthorizeController {
                         if (unzipFiles[0].getName().equals("scripts")) {
                             File[] groovyFiles = unzipFiles[0].listFiles()
                             for (File theGroovyFile : groovyFiles) {
+                                String rootFileName = theGroovyFile.listFiles()[0].getName()
                                 String serviceNameVersion = theGroovyFile.getName()
                                 Document document = serversService.getServerConfig(serviceNameVersion)
                                 if (serviceNameVersion.contains(CommonStants.SERVICE_VERSION_SYMBOL)) {
-                                    if (document == null) {
+                                    if (document == null && rootFileName.equals("groovy.zip")) {
                                         String versionNumber = serviceNameVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[1]
                                         String serviceName = serviceNameVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)[0]
                                         Integer oldVersionNumber = Integer.valueOf(versionNumber)
@@ -150,7 +151,10 @@ public class AuthorizeController {
                                         document.put("_id", serviceNameVersion)
                                         serversService.addServerConfig(document)
                                     }
-                                    uploadGroovyZip(FileUtils.openInputStream(new File(theGroovyFile.getAbsolutePath() + File.separator + "groovy.zip")), theGroovyFile.getName())
+                                    if(theGroovyFile.listFiles().length == 0){
+                                        throw new GeneralException(Errors.ERROR_GROOVYS_NOTMATCH, "Cant find rootFile in " + serviceNameVersion)
+                                    }
+                                    uploadGroovyZip(FileUtils.openInputStream(new File(theGroovyFile.getAbsolutePath() + File.separator + rootFileName)), theGroovyFile.getName(), rootFileName)
                                 }
                             }
                         } else {
@@ -201,8 +205,15 @@ public class AuthorizeController {
     @PostMapping("/groovyzip")
     def uploadGroovy(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "s") String serviceName, @RequestParam(value = "v") String version) {
+            @RequestParam(value = "s") String serviceName, @RequestParam(value = "v") String version, @RequestParam(value = "t") String type) {
         if (file != null) {
+            String[] fileNames = file.getOriginalFilename().split("\\.")
+            String factSuffix = fileNames[fileNames.length - 1]
+            String[] types = type.split("\\.")
+            String suffix = types[types.length - 1]
+            if(!factSuffix.equals(suffix)){
+                throw new GeneralException(Errors.ERROR_FILE_TYPE_NOT_MATCH, "Files's type not match, suffix: " + suffix + ",factSuffix: " + factSuffix)
+            }
             String serviceNameVersion = null
             if (version != null) {
                 String versionNumber = null
@@ -220,7 +231,7 @@ public class AuthorizeController {
                     }
                 }
                 Document document = serversService.getServerConfig(serviceNameVersion)
-                if (document == null) {
+                if (document == null && type.equals("groovy.zip")) {
                     Integer oldVersionNumber = Integer.valueOf(versionNumber)
                     while (document == null && oldVersionNumber != 0) {
                         oldVersionNumber = oldVersionNumber - 1
@@ -238,14 +249,21 @@ public class AuthorizeController {
                     document.put("_id", serviceNameVersion)
                     serversService.addServerConfig(document)
                 }
-                uploadGroovyZip(file.getInputStream(), serviceNameVersion)
+                uploadGroovyZip(file.getInputStream(), serviceNameVersion, type)
             }
         }
     }
 
-    private def uploadGroovyZip(InputStream inputStream, String serviceNameVersion) {
+    private def uploadGroovyZip(InputStream inputStream, String serviceNameVersion, String rootFileName) {
         try {
-            String thePath = applicationConfig.scriptRemotePath + serviceNameVersion + "/groovy.zip"
+            if(StringUtils.isBlank(rootFileName)){
+                rootFileName = "groovy.zip"
+            }
+            if(serviceNameVersion.contains("#")){
+                serviceNameVersion = serviceNameVersion.split("#")[0]
+            }
+            rootFileName = rootFileName.trim()
+            String thePath = applicationConfig.scriptRemotePath + serviceNameVersion + (rootFileName.equals("java.jar") ? "#Jar" : "") + File.separator + rootFileName
             FileAdapter.PathEx path = new FileAdapter.PathEx(thePath);
             fileAdapter.saveFile(inputStream, path, FileAdapter.FileReplaceStrategy.REPLACE);
             String[] serviceNameVersions = serviceNameVersion.split(CommonStants.SERVICE_VERSION_SYMBOL)

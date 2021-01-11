@@ -14,4 +14,5 @@ class Errors {
     public static final Integer ERROR_CANTFIND_NGINX = 5007
     public static final Integer ERROR_CANTLOADAGAIN = 5008
     public static final Integer ERROR_SFTP_DOWNLOAD_FAILED = 5009
+    public static final Integer ERROR_FILE_TYPE_NOT_MATCH = 5010
 }

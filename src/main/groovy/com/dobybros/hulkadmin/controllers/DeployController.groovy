@@ -78,7 +78,7 @@ class DeployController {
     @Autowired
     RedisManager redisManager
     @Autowired
-    ServerTypeManager serverTypeManagerF
+    ServerTypeManager serverTypeManager
     @Autowired
     ServerManager serverManager
     @Autowired
@@ -553,7 +553,13 @@ class DeployController {
                 newServiceMap.put("serviceName", serviceName)
                 List versionList = new ArrayList()
                 List<Integer> sortList = new ArrayList()
+                String type = "groovy"
                 for (String version : versionDateMap.keySet()) {
+                    String[] versionStrs = version.split("#")
+                    version = versionStrs[0]
+                    if(versionStrs.length > 1){
+                        type = versionStrs[1].toLowerCase()
+                    }
                     sortList.add(Integer.valueOf(version))
                 }
                 Collections.sort(sortList)
@@ -562,15 +568,17 @@ class DeployController {
                     for (int i = sortList.size() - 1; i >= 0; i--) {
                         if (i == sortList.size() - 1) {
                             newServiceMap.put("version", String.valueOf(sortList.get(i)))
-                            newServiceMap.put("date", versionDateMap.get(String.valueOf(sortList.get(i))))
+                            newServiceMap.put("date", versionDateMap.get(String.valueOf(type.equals("groovy") ? sortList.get(i) : sortList.get(i) + "#Jar")))
                             newServiceMap.put("maxVersion", String.valueOf(sortList.get(i)))
                             newServiceMap.put("id", UUID.randomUUID().toString())
+                            newServiceMap.put("type", type)
                         } else {
                             Map newVersionDateMap = new HashMap()
                             newVersionDateMap.put("serviceName", serviceName)
                             newVersionDateMap.put("version", String.valueOf(sortList.get(i)))
-                            newVersionDateMap.put("date", versionDateMap.get(String.valueOf(sortList.get(i))))
+                            newVersionDateMap.put("date", versionDateMap.get(String.valueOf(type.equals("groovy") ? sortList.get(i) : sortList.get(i) + "#Jar")))
                             newVersionDateMap.put("id", UUID.randomUUID().toString())
+                            newVersionDateMap.put("type", type)
                             interalList.add(newVersionDateMap)
                         }
                         Map versionMap = new HashMap()

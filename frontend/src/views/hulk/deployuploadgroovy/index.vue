@@ -58,10 +58,16 @@
                     >
                     </el-table-column>
                     <el-table-column
+                            prop="type"
+                            label="type"
+                    >
+                    </el-table-column>
+                    <el-table-column
                             prop="date"
                             label="Upload time">
                     </el-table-column>
                     <el-table-column
+                            width="400px"
                             label="Operations">
                         <template slot-scope="scope" v-if="scope.row.version === scope.row.maxVersion">
                             <el-button
@@ -91,10 +97,10 @@
         </el-main>
         <el-dialog
                 :visible.sync="dialogVisible"
-                width="50%"
+                width="70%"
         >
             <el-row>
-                <el-col :span="10">
+                <el-col :span="7">
                     <el-input v-model="serviceName" placeholder="Input service name">
                         <template slot="prepend">{{$t("views.deploy.serviceName")}}</template>
                     </el-input>
@@ -105,18 +111,32 @@
                 <el-col :span="5">
                     <el-autocomplete
                             v-model="value"
+                            style="width:100%;"
                             placeholder="Select version"
                             :fetch-suggestions="selectVersion"
                             clearable/>
+                </el-col>
+                <el-col :span="3">
+                    <el-input :disabled="true" placeholder="type"></el-input>
+                </el-col>
+                <el-col :span="5">
+                    <el-select v-model="uploadType" placeholder="Select type">
+                        <el-option
+                                v-for="item in uploadTypes"
+                                :key="item.value"
+                                :label="item.label"
+                                :value="item.value">
+                        </el-option>
+                    </el-select>
                 </el-col>
             </el-row>
 
             <span slot="footer" class="dialog-footer">
                 <span class="uploader">
                     <el-upload
-                            accept=".zip"
                             class="upload-demo"
                             ref="uploadGroovy"
+                            accept=".zip,.jar"
                             :action="uploadUrlData"
                             :on-success="uploadGroovySuccess"
                             :on-progress="onProgress"
@@ -218,7 +238,17 @@
                 cascaderValue: [],
                 searchInput: '',
                 uploadDisabled: false,
-                groovyLimit: 1
+                groovyLimit: 1,
+                uploadTypes:[
+                    {
+                        value: 'java.jar',
+                        label: 'jar'
+                    }, {
+                        value: 'groovy.zip',
+                        label: 'groovy'
+                    }
+                ],
+                uploadType: 'groovy.zip'
             }
         },
         created() {
@@ -271,6 +301,7 @@
                     }, 1000)
                 } else {
                     this.$message.error("File " + file.name + "Upload Failed! errMsg: " + res.message)
+                    this.uploadDisabled = false
                 }
                 this.geoovysList = []
                 this.fileList = []
@@ -281,10 +312,12 @@
                 if (data !== undefined) {
                     this.everyData = data
                     this.serviceName = data.serviceName
+                    this.uploadType = data.type === "groovy" ? "groovy.zip" : "java.jar"
                     this.uploadDisabled = false
                 } else {
                     this.everyData = {}
                     this.serviceName = ""
+                    this.uploadType = ""
                 }
             },
             uploadGroovys(num) {
@@ -464,7 +497,7 @@
                 } else {
                     uploadHost = process.env.VUE_APP_API
                 }
-                let param = uploadHost + this.uploadUrl + "?s=" + this.serviceName + "&v=" + this.value
+                let param = uploadHost + this.uploadUrl + "?s=" + this.serviceName + "&v=" + this.value + "&t=" + this.uploadType
                 return param
             }
         }
