@@ -14,3 +14,9 @@ export function PutApp(app) {
     data: app
   })
 }
+export function DeleteApp(appNumber) {
+  return request({
+    url: `/version/app/delete?appnum=${appNumber}`,
+    method: 'delete'
+  })
+}

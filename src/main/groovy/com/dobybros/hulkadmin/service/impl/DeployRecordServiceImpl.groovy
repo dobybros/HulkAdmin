@@ -50,7 +50,7 @@ class DeployRecordServiceImpl implements DeployRecordService {
     @Override
     List<DeployRecord> getDeployRecords() {
         Document query = new Document();
-        FindIterable<Document> iterable = getDeployRecordDao().query(query);
+        FindIterable<Document> iterable = getDeployRecordDao().query(query).limit(200);
         iterable.sort(new Document(DeployRecord.TIME, -1));
         MongoCursor<Document> cursor = iterable.iterator();
         List<DeployRecord> deployRecords = new ArrayList<>();

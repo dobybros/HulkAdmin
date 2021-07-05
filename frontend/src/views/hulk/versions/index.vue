@@ -34,6 +34,10 @@
                   size="mini"
                   @click="editAppInfo(scope.row)">{{$t('views.versions.title.editApp')}}
               </el-button>
+              <el-button
+                  size="mini"
+                  @click="deleteApp(scope.row, scope.$index)">{{$t('views.deploy.delete')}}
+              </el-button>
               <!--              <el-button-->
               <!--                  size="mini"-->
               <!--                  @click="currentEditApp=scope.row">{{$t('views.versions.title.addBuild')}}-->
@@ -126,7 +130,7 @@
 </template>
 
 <script>
-  import {GetAllApp, PutApp} from "../../../api/versions.api";
+  import {GetAllApp, PutApp, DeleteApp} from "../../../api/versions.api";
 
   export default {
     name: "Version",
@@ -160,6 +164,24 @@
           })
           this.apps = newApp
         })
+      },
+      deleteApp(app, index) {
+        console.log(app)
+        this.$confirm('Do you want to delete?', 'Tips', {
+          confirmButtonText: 'Done',
+          cancelButtonText: 'Cancel',
+          type: 'warning'
+        }).then(() => {
+          const appNumber = app.appNumber
+          DeleteApp(appNumber).then((data) => {
+            console.log(this)
+            this.$message.success('Successfully');
+            this.updateAllApps()
+          }).catch(err => {
+            console.error(err)
+          })
+        });
+
       },
       editAppInfo(app) {
         this.isCreate = false

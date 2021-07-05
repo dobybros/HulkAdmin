@@ -10,4 +10,6 @@ interface VersionService {
     List<App> getAllApp()
 
     void addBuild(String appNumber, Build build)
+
+    void deleteApp(String appNumber)
 }

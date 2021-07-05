@@ -78,7 +78,7 @@ class DeployController {
     @Autowired
     RedisManager redisManager
     @Autowired
-    ServerTypeManager serverTypeManagerF
+    ServerTypeManager serverTypeManager
     @Autowired
     ServerManager serverManager
     @Autowired

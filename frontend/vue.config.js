@@ -17,7 +17,8 @@ module.exports = {
   outputDir,
   lintOnSave: true,
   devServer: {
-    publicPath // 和 publicPath 保持一致
+    publicPath, // 和 publicPath 保持一致
+    hot: true
   },
   css: {
     loaderOptions: {

@@ -138,7 +138,8 @@ class WebVersionManager {
             response.setContentType("application/zip");
             response.addHeader("Content-Disposition", "attachment;fileName=" + projectVersionName + ".zip");
             remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo cp -r " + projectPath + "/" + version + " ./" + projectVersionName)
-            remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo zip -r " + projectVersionName + ".zip " + projectVersionName + "/*")
+            //remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("sudo zip -r " + projectVersionName + ".zip " + projectVersionName + "/*")
+            remoteClientBuilder.buildShellClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort())).excuteCommand("cd " + projectVersionName + " && sudo zip -r ../" + projectVersionName + ".zip ./*")
             sftpClient = remoteClientBuilder.buildSftpClient(nginx.getIp(), nginx.getAccount(), nginx.getPasswd(), Integer.valueOf(nginx.getPort()))
             inputStream = sftpClient.download(projectVersionName + ".zip")
             if(inputStream != null){

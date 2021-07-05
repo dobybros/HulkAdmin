@@ -27,4 +27,10 @@ class VersionManagementController {
         VersionService versionService = serviceStubManager.getService(VersionService.SERVICE, VersionService.class)
         return versionService.putApp(app)
     }
+
+    @DeleteMapping("/app/delete")
+    def deleteApp(@RequestParam(name = "appnum", required = true) String appNumber) {
+        VersionService versionService = serviceStubManager.getService(VersionService.SERVICE, VersionService.class)
+        return versionService.deleteApp(appNumber)
+    }
 }
