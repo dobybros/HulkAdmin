@@ -19,7 +19,7 @@ class VersionManagementController {
     @GetMapping("/app/all")
     def getAllApps() {
         VersionService versionService = serviceStubManager.getService(VersionService.SERVICE, VersionService.class)
-        return versionService.getAllApp()
+        return versionService.getAllAppAndBuild()
     }
 
     @PutMapping("/app")

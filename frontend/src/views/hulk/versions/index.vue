@@ -115,7 +115,7 @@
                   <i class="el-icon-upload"></i>
                 </el-upload>
                 <div style="text-align: center;">
-                  <el-button @click="$delete(currentEditApp.builds, idx)" type="danger" icon="el-icon-delete"
+                  <el-button @click="deleteBuild(idx)" type="danger" icon="el-icon-delete"
                              circle></el-button>
                 </div>
               </el-form>
@@ -220,6 +220,18 @@
           this.updateAllApps()
           this.showEditModal = false
         })
+      },
+      deleteBuild(index) {
+        const deleteBuild = this.currentEditApp.builds[index]
+        if (deleteBuild && deleteBuild.id) {
+          if (!this.currentEditApp.deleteBuilds) {
+            this.$set(this.currentEditApp, 'deleteBuilds', [])
+          }
+          this.currentEditApp.deleteBuilds.unshift(deleteBuild.id)
+        }
+        this.currentEditApp.builds.splice(index, 1)
+
+        //this.$delete(currentEditApp.builds, index)
       }
     }
   }

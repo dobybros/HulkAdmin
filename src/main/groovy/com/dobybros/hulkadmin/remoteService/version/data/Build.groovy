@@ -2,9 +2,10 @@ package com.dobybros.hulkadmin.remoteService.version.data
 
 import connectors.mongodb.annotations.DBDocument
 import connectors.mongodb.codec.BaseObject
+import connectors.mongodb.codec.DataObject
 
 @DBDocument
-class Build extends BaseObject {
+class Build extends DataObject {
     private Integer buildNumber
     private String version
     private Integer type

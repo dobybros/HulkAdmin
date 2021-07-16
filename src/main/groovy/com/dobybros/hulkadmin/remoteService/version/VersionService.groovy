@@ -9,6 +9,8 @@ interface VersionService {
 
     List<App> getAllApp()
 
+    List<App> getAllAppAndBuild()
+
     void addBuild(String appNumber, Build build)
 
     void deleteApp(String appNumber)

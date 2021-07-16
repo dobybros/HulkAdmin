@@ -8,12 +8,21 @@ class App extends DataObject {
     private String appId
     private String name
     private List<Build> builds
+    private List<String> deleteBuilds
     private String project
     private Integer minBuild
     private String deviceType
     private String deviceRegular
     private Long createTime
     private Long updateTime
+
+    List<String> getDeleteBuilds() {
+        return deleteBuilds
+    }
+
+    void setDeleteBuilds(List<String> deleteBuilds) {
+        this.deleteBuilds = deleteBuilds
+    }
 
     String getAppNumber() {
         return appNumber
